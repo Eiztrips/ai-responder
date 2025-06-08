@@ -2,6 +2,7 @@ import os
 import json
 import torch
 import functools
+import re
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import gc
 import logging
@@ -84,6 +85,21 @@ class ResponseGenerator:
         latest_model = max(model_dirs, key=os.path.getmtime)
         return self.load_model(latest_model)
     
+    def clean_response(self, text):
+        """
+        Очищает ответ от маркеров и неадекватных фрагментов.
+        """
+        # Удаляем все маркеры типа @@ТЕКСТ@@
+        text = re.sub(r'@@[^@]*@@', '', text)
+        
+        # Удаляем префиксы в начале строк (E:, A:, Q: и т.д.)
+        text = re.sub(r'(?m)^[A-Z]:\s*', '', text)
+        
+        # Удаляем лишние пробелы и переносы строк
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        return text
+    
     @functools.lru_cache(maxsize=128)
     def _cached_generate_response(self, message_key, max_length):
         if not self.model or not self.tokenizer:
@@ -95,14 +111,17 @@ class ResponseGenerator:
         
         with torch.no_grad():
             output = self.model.generate(
-                inputs, 
-                max_length=max_length,
+                inputs,
+                max_length=30,
                 num_return_sequences=1,
                 pad_token_id=self.tokenizer.eos_token_id,
                 do_sample=True,
                 temperature=0.8,
-                top_p=0.92,
-                no_repeat_ngram_size=2
+                top_p=0.5,
+                no_repeat_ngram_size=4,
+                repetition_penalty=1.4,
+                length_penalty=0.6,
+                early_stopping=True
             )
         
         response = self.tokenizer.decode(output[0], skip_special_tokens=True)
@@ -111,6 +130,8 @@ class ResponseGenerator:
             answer = response.split("A:")[1].strip()
         except:
             answer = response
+
+        answer = self.clean_response(answer)
         
         return answer
     

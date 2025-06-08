@@ -106,11 +106,11 @@ class ModelTrainer:
             )
             
             model_save_path = os.path.join(self.model_dir, f"{target_user_name.replace(' ', '_')}_model")
-            
+
             training_args = TrainingArguments(
                 output_dir=model_save_path,
                 overwrite_output_dir=True,
-                num_train_epochs=3,
+                num_train_epochs=3,  # Изменить на 4
                 per_device_train_batch_size=batch_size,
                 gradient_accumulation_steps=8,
                 save_steps=500,
@@ -118,9 +118,9 @@ class ModelTrainer:
                 logging_steps=50,
                 fp16=False,
                 optim="adamw_torch",
-                learning_rate=5e-5,
+                learning_rate=5e-5,  # Изменить на 2e-5
                 warmup_steps=100,
-                weight_decay=0.01,
+                weight_decay=0.01,  # Изменить на 0.02
                 lr_scheduler_type="cosine",
                 report_to="none",
                 dataloader_num_workers=0,

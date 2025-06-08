@@ -1,4 +1,5 @@
 import os
+import sys
 from src.utils.data_processor import DataProcessor
 from src.ml.model_trainer import ModelTrainer
 from src.utils.inference import ResponseGenerator
@@ -37,7 +38,7 @@ def update_env_value(key, new_value):
     for i, line in enumerate(lines):
         # Ищем строку с нужным ключом
         if line.startswith(f"{key}=") or line.startswith(f"{key}="):
-            # ��охраняем комментарий, если есть
+            # Со��раняем комментарий, если есть
             comment = ""
             if "#" in line:
                 comment = line[line.find("#"):]
@@ -117,7 +118,7 @@ def select_training_device(model_trainer):
     config = load_config()
     current_device = config.get("training_device", model_trainer.get_current_device())
     
-    print("\n===== Выбор устройства для обуче��ия =====")
+    print("\n===== Выбор устройства для обучения =====")
     print(f"Текущее устройство: {current_device}")
     
     available_devices = model_trainer.get_available_devices()
@@ -146,12 +147,18 @@ def select_training_device(model_trainer):
             print("Неверный выбор.")
             
     except ValueError:
-        print("Пожалуйста, введит�� число.")
+        print("Пожалуйста, введите число.")
 
 async def main():
     data_processor = DataProcessor()
     config = load_config()
-    model_trainer = ModelTrainer(device=config.get("training_device"))
+    
+    # Безопасная инициализация ModelTrainer с проверкой поддержки device
+    try:
+        model_trainer = ModelTrainer(device=config.get("training_device"))
+    except TypeError:
+        print("Предупреждение: Ваша версия ModelTrainer не поддерживает выбор устройства. Используется CPU.")
+        model_trainer = ModelTrainer()  # Пробуем без аргумента device
     
     while True:
         choice = display_menu()
@@ -168,7 +175,7 @@ async def main():
                 print(f"{i}. {dataset['name']} ({dataset['type'].upper()})")
             
             try:
-                file_idx = int(input("\nВыберите датасет для обучения (номер): ")) - 1
+                file_idx = int(input("\nВыберите дат��сет для обучения (номер): ")) - 1
                 if 0 <= file_idx < len(datasets):
                     selected_dataset = datasets[file_idx]
                     
@@ -177,7 +184,7 @@ async def main():
                     
                     print("\nДоступные пользователи для имитации:")
                     for i, user in enumerate(participants, 1):
-                        print(f"{i}. {user['name']} (Со��бщений: {user['message_count']})")
+                        print(f"{i}. {user['name']} (Сообщений: {user['message_count']})")
                     
                     user_idx = int(input("\nВыберите пользователя для имитации (номер): ")) - 1
                     if 0 <= user_idx < len(participants):
@@ -301,14 +308,19 @@ async def main():
                 print("Клиент остановлен")
         
         elif choice == "7":
-            select_training_device(model_trainer)
+            # Проверяем поддержку выбора устройства
+            if hasattr(model_trainer, "get_available_devices") and callable(getattr(model_trainer, "get_available_devices")):
+                select_training_device(model_trainer)
+            else:
+                print("\n❌ Ваша версия программы не поддерживает выбор устройства обучения.")
+                print("Пожалуйста, убедитесь, что установлена последняя версия.")
         
         elif choice == "8":
             print("Выход из программы...")
             break
         
         else:
-            print("Неверный выбор. Пожалуйста, выберите 1-8")
+            print("Неверный выбо��. Пожалуйста, выберите 1-8")
 
 if __name__ == "__main__":
     asyncio.run(main())

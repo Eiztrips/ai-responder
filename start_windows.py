@@ -1,9 +1,13 @@
 import os
+import sys
 import logging
 from main import main
 import asyncio
 import gc
 import torch
+
+# Добавляем корневую директорию проекта в путь поиска модулей
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 os.environ["OMP_NUM_THREADS"] = "4"
 
@@ -31,5 +35,13 @@ if __name__ == "__main__":
         ]
     )
 
+    # Проверка наличия модуля model_trainer и его версии
+    try:
+        from src.ml.model_trainer import ModelTrainer
+        test_instance = ModelTrainer()
+        print("Модуль ModelTrainer успешно загружен")
+    except Exception as e:
+        print(f"Ошибка при инициализации ModelTrainer: {e}")
+    
     logging.info("Запуск на Windows с оптимизацией для NVIDIA GPU")
     asyncio.run(main())

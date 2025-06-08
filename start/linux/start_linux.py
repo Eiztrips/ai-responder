@@ -1,6 +1,6 @@
 import os
 import logging
-from main import main
+from start.main import main
 import asyncio
 import gc
 import torch
@@ -23,7 +23,7 @@ if __name__ == "__main__":
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler('training_log.txt')
+            logging.FileHandler('../../training_log.txt')
         ]
     )
 

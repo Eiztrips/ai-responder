@@ -4,9 +4,14 @@ import asyncio
 from pyrogram import Client
 from pyrogram.handlers import MessageHandler
 from pyrogram.enums import ChatAction, ChatType
+from pyrogram.errors import (
+    AuthKeyUnregistered, BadRequest, Unauthorized, 
+    FloodWait, InternalServerError,
+    PhoneNumberInvalid, PhoneCodeInvalid
+)
 
 from src.utils.inference import ResponseGenerator
-from decouple import config
+from decouple import config, UndefinedValueError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,38 +21,67 @@ logger = logging.getLogger(__name__)
 
 class TelegramResponder:
     def __init__(self, model_path=None):
-        self.api_id = config('API_ID')
-        self.api_hash = config('API_HASH')
-        self.phone = config('PHONE')
-        self.login = config('LOGIN')
+        try:
+            self.api_id = config('API_ID')
+            self.api_hash = config('API_HASH')
+            self.phone = config('PHONE')
+            self.login = config('LOGIN')
 
-        target_user_ids_raw = config('TARGET_USER_IDS', default='-1')
-        target_channel_ids_raw = config('TARGET_CHANNEL_IDS', default='-1')
+            # Проверка наличия и валидности конфигурационных данных
+            if not self.api_id or not self.api_hash:
+                logger.error("API_ID или API_HASH отсутствуют в конфигурации")
+                raise ValueError("API_ID и API_HASH должны быть указаны в файле .env")
+                
+            if not self.phone or len(self.phone) < 5:
+                logger.error(f"Неверный номер телефона в конфигурации: {self.phone}")
+                raise ValueError("Номер телефона должен быть указан в файле .env")
+                
+            if not self.login:
+                logger.warning("LOGIN не указан, будет использовано значение 'user'")
+                self.login = 'user'
+                
+            target_user_ids_raw = config('TARGET_USER_IDS', default='-1')
+            target_channel_ids_raw = config('TARGET_CHANNEL_IDS', default='-1')
 
-        self.target_user_ids = [int(uid.strip()) for uid in target_user_ids_raw.split('#')[0].split(',') if uid.strip()]
-        self.target_channel_ids = [int(cid.strip()) for cid in target_channel_ids_raw.split('#')[0].split(',') if cid.strip()]
-        
-        self.mode = config('MODE')
-        
-        self.session_path = os.path.join(os.path.dirname(__file__), 'session', self.login)
-        os.makedirs(os.path.dirname(self.session_path), exist_ok=True)
-        
-        self.client = Client(
-            self.session_path,
-            api_id=self.api_id,
-            api_hash=self.api_hash,
-            phone_number=self.phone
-        )
-        
-        self.response_generator = ResponseGenerator(model_path)
-        self.model_info = self._get_model_info()
-        
-        self.is_running = False
-        
-        logger.info(f"TelegramResponder инициализирован с моделью: {self.model_info}")
-        logger.info(f"Режим работы: {self.mode}")
-        logger.info(f"Целевые пользователи: {self.target_user_ids}")
-        logger.info(f"Целевые каналы/группы: {self.target_channel_ids}")
+            self.target_user_ids = [int(uid.strip()) for uid in target_user_ids_raw.split('#')[0].split(',') if uid.strip()]
+            self.target_channel_ids = [int(cid.strip()) for cid in target_channel_ids_raw.split('#')[0].split(',') if cid.strip()]
+            
+            self.mode = config('MODE', default='only_private_chats')
+            
+            self.session_path = os.path.join(os.path.dirname(__file__), 'session', self.login)
+            os.makedirs(os.path.dirname(self.session_path), exist_ok=True)
+            
+            # Настройка клиента с таймаутами и попытками повтора
+            self.client = Client(
+                self.session_path,
+                api_id=self.api_id,
+                api_hash=self.api_hash,
+                phone_number=self.phone,
+                app_version="AI Responder 1.0",
+                device_model="PC",
+                system_version="Python",
+                sleep_threshold=10,
+            )
+            
+            self.response_generator = ResponseGenerator(model_path)
+            self.model_info = self._get_model_info()
+            
+            self.is_running = False
+            
+            logger.info(f"TelegramResponder инициализирован с моделью: {self.model_info}")
+            logger.info(f"Режим работы: {self.mode}")
+            logger.info(f"Целевые пользователи: {self.target_user_ids}")
+            logger.info(f"Целевые каналы/группы: {self.target_channel_ids}")
+            
+        except UndefinedValueError as e:
+            logger.error(f"Ошибка конфигурации: {e}")
+            self.config_error = f"Отсутствует необходимый параметр в файле .env: {str(e)}"
+            raise ValueError(f"Ошибка конфигурации: {e}")
+            
+        except Exception as e:
+            logger.error(f"Ошибка инициализации TelegramResponder: {e}")
+            self.config_error = f"Ошибка инициализации: {str(e)}"
+            raise
 
     def _get_model_info(self):
         if hasattr(self.response_generator, 'metadata'):
@@ -55,16 +89,23 @@ class TelegramResponder:
         return "Последняя доступная модель"
 
     async def _send_response(self, client, message):
-        logger.info(f"Получено сообщение: {message.text}")
-        
-        response = self.response_generator.generate_response(message.text)
-        delay = min(len(response) * 0.1, 3)
-        
-        await client.send_chat_action(message.chat.id, ChatAction.TYPING)
-        await asyncio.sleep(delay)
-        await message.reply(response)
-        
-        logger.info(f"Отправлен ответ: {response}")
+        try:
+            logger.info(f"Получено сообщение от {message.from_user.first_name} ({message.from_user.id}): {message.text}")
+            
+            response = self.response_generator.generate_response(message.text)
+            delay = min(len(response) * 0.1, 3)
+            
+            await client.send_chat_action(message.chat.id, ChatAction.TYPING)
+            await asyncio.sleep(delay)
+            await message.reply(response)
+            
+            logger.info(f"Отправлен ответ: {response}")
+        except FloodWait as e:
+            logger.warning(f"FloodWait: Ожидаем {e.value} секунд перед повторной попыткой")
+            await asyncio.sleep(e.value)
+            await self._send_response(client, message)
+        except Exception as e:
+            logger.error(f"Ошибка при отправке ответа: {e}")
 
     async def message_handler(self, client, message):
         if message.outgoing:
@@ -73,19 +114,22 @@ class TelegramResponder:
         if not message.text:
             return
 
-        if self.mode == "only_private_chats":
-            if message.chat.type == ChatType.PRIVATE:
-                if -1 in self.target_user_ids or message.from_user.id in self.target_user_ids:
+        try:
+            if self.mode == "only_private_chats":
+                if message.chat.type == ChatType.PRIVATE:
+                    if -1 in self.target_user_ids or message.from_user.id in self.target_user_ids:
+                        await self._send_response(client, message)
+            
+            elif self.mode == "only_channel_messages":
+                if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
+                    if -1 in self.target_channel_ids or message.chat.id in self.target_channel_ids:
+                        await self._send_response(client, message)
+            
+            elif self.mode == "stalker":
+                if message.from_user and message.from_user.id in self.target_user_ids:
                     await self._send_response(client, message)
-        
-        elif self.mode == "only_channel_messages":
-            if message.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-                if -1 in self.target_channel_ids or message.chat.id in self.target_channel_ids:
-                    await self._send_response(client, message)
-        
-        elif self.mode == "stalker":
-            if message.from_user and message.from_user.id in self.target_user_ids:
-                await self._send_response(client, message)
+        except Exception as e:
+            logger.error(f"Ошибка при обработке сообщения: {e}")
 
     async def start(self):
         if not self.response_generator.model:
@@ -102,22 +146,82 @@ class TelegramResponder:
         print(f"Режим: {self.mode}")
         print("Запуск клиента...")
         
-        await self.client.start()
-        
-        if self.mode == "only_private_chats":
-            target_info = "всех личных чатах" if -1 in self.target_user_ids else f"личных чатах с пользователями {self.target_user_ids}"
-        elif self.mode == "only_channel_messages":
-            target_info = "всех беседах/группах" if -1 in self.target_channel_ids else f"беседах/группах {self.target_channel_ids}"
-        else:
-            target_info = f"любых чатах для пользователей {self.target_user_ids}"
+        # Добавляем тайм-аут и обработку ошибок подключения
+        try:
+            logger.info("Подключение к Telegram API...")
+            await asyncio.wait_for(self.client.start(), timeout=60.0)
+            logger.info("Успешное подключение к Telegram API")
             
-        print(f"✅ Бот успешно запущен и готов отвечать в {target_info}")
-        print("Нажмите Ctrl+C для остановки.")
-        
-        while self.is_running:
-            await asyncio.sleep(1)
+            if self.mode == "only_private_chats":
+                target_info = "всех личных чатах" if -1 in self.target_user_ids else f"личных чатах с пользователями {self.target_user_ids}"
+            elif self.mode == "only_channel_messages":
+                target_info = "всех беседах/группах" if -1 in self.target_channel_ids else f"беседах/группах {self.target_channel_ids}"
+            else:
+                target_info = f"любых чатах для пользователей {self.target_user_ids}"
+                
+            print(f"✅ Бот успешно запущен и готов отвечать в {target_info}")
+            print("Нажмите Ctrl+C для остановки.")
+            
+            # Получаем информацию о текущем пользователе для дополнительной проверки
+            me = await self.client.get_me()
+            logger.info(f"Подключен как: {me.first_name} {me.last_name} (@{me.username})")
+            
+            while self.is_running:
+                await asyncio.sleep(1)
+                
+        except asyncio.TimeoutError:
+            logger.error("Тайм-аут подключения к Telegram API")
+            print("❌ Не удалось подключиться к Telegram API: тайм-аут соединения")
+            print("Проверьте ваше интернет-соединение и конфигурацию API")
+            self.is_running = False
+            
+        except (AuthKeyUnregistered, BadRequest, Unauthorized) as e:
+            logger.error(f"Ошибка авторизации: {e}")
+            print(f"❌ Ошибка авторизации Telegram: {e}")
+            print("Проверьте правильность API_ID, API_HASH и PHONE в файле .env")
+            
+            # Удаляем файл сессии, чтобы пользователь мог перелогиниться
+            try:
+                session_file = self.session_path + ".session"
+                if os.path.exists(session_file):
+                    os.remove(session_file)
+                    logger.info(f"Удален файл сессии: {session_file}")
+            except Exception as ex:
+                logger.error(f"Ошибка при удалении файла сессии: {ex}")
+                
+            self.is_running = False
+            
+        except (PhoneNumberInvalid, PhoneCodeInvalid) as e:
+            logger.error(f"Ошибка с номером телефона: {e}")
+            print(f"❌ Проблема с номером телефона: {e}")
+            print("Проверьте правильность номера телефона в файле .env")
+            self.is_running = False
+            
+        except KeyboardInterrupt:
+            logger.info("Получен сигнал прерывания")
+            print("⚠️ Остановка по запросу пользователя...")
+            self.is_running = False
+            await self.stop()
+            
+        except Exception as e:
+            logger.exception(f"Непредвиденная ошибка при запуске клиента: {e}")
+            print(f"❌ Произошла ошибка: {e}")
+            self.is_running = False
+            
+        finally:
+            if self.is_running:
+                await self.stop()
 
     async def stop(self):
+        if not self.is_running:
+            return
+            
         self.is_running = False
-        await self.client.stop()
-        logger.info("Клиент остановлен")
+        try:
+            logger.info("Остановка клиента...")
+            await self.client.stop()
+            logger.info("Клиент успешно остановлен")
+            print("✅ Клиент успешно остановлен")
+        except Exception as e:
+            logger.error(f"Ошибка при остановке клиента: {e}")
+            print(f"⚠️ Проблема при остановке клиента: {e}")

@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
+
 import os
 import logging
-from main import main
+from start.main import main
 import asyncio
 import gc
 import torch
@@ -12,18 +14,15 @@ if __name__ == "__main__":
     gc.collect()
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
-        print(f"Apple Silicon GPU (MPS) обнаружена и будет использоваться для обучения")
-    else:
-        print("MPS недоступен, будет использоваться CPU")
-
+    
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler('training_log.txt')
+            logging.FileHandler('../training_log.txt')
         ]
     )
-
-    logging.info("Запуск на macOS с оптимизацией для Apple Silicon")
+    
+    logging.info("Запуск с оптимизированными параметрами памяти")
     asyncio.run(main())

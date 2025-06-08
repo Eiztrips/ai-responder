@@ -9,21 +9,29 @@ from tkinter import filedialog
 import tkinter as tk
 import json
 import re
-from decouple import config
+from decouple import config, UndefinedValueError
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config', 'config.json')
 ENV_FILE = os.path.join(os.path.dirname(__file__), '.env')
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"Ошибка в формате JSON файла конфигурации: {e}")
+        except Exception as e:
+            print(f"Не удалось загрузить конфигурацию: {e}")
     return {"selected_model": None, "training_device": None}
 
 def save_config(config):
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Не удалось сохранить конфигурацию: {e}")
 
 def update_env_value(key, new_value):
     """Обновляет значение переменной в файле .env"""
@@ -37,8 +45,8 @@ def update_env_value(key, new_value):
     updated = False
     for i, line in enumerate(lines):
         # Ищем строку с нужным ключом
-        if line.startswith(f"{key}=") or line.startswith(f"{key}="):
-            # Со��раняем комментарий, если есть
+        if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
+            # Сохраняем комментарий, если есть
             comment = ""
             if "#" in line:
                 comment = line[line.find("#"):]
@@ -65,8 +73,9 @@ def display_menu():
     print("5. Изменить режим работы Telegram клиента")
     print("6. Запустить Telegram клиент")
     print("7. Выбрать устройство для обучения")
-    print("8. Выход")
-    return input("Выберите опцию (1-8): ")
+    print("8. Настроить Telegram API")
+    print("9. Выход")
+    return input("Выберите опцию (1-9): ")
 
 def select_json_file():
     root = tk.Tk()
@@ -149,13 +158,89 @@ def select_training_device(model_trainer):
     except ValueError:
         print("Пожалуйста, введите число.")
 
+def configure_telegram_api():
+    """Позволяет настроить параметры Telegram API"""
+    print("\n===== Настройка Telegram API =====")
+    
+    if not os.path.exists(ENV_FILE):
+        with open(ENV_FILE, 'w', encoding='utf-8') as f:
+            f.write("# Telegram API Settings\n")
+            f.write("API_ID=\n")
+            f.write("API_HASH=\n")
+            f.write("PHONE=\n")
+            f.write("LOGIN=user\n\n")
+            f.write("# Bot Settings\n")
+            f.write("MODE=only_private_chats\n")
+            f.write("TARGET_USER_IDS=-1\n")
+            f.write("TARGET_CHANNEL_IDS=-1\n")
+        print("Создан новый файл .env с шаблоном настроек")
+    
+    try:
+        current_api_id = config('API_ID', default='')
+        current_api_hash = config('API_HASH', default='')
+        current_phone = config('PHONE', default='')
+        current_login = config('LOGIN', default='user')
+    except:
+        current_api_id = ''
+        current_api_hash = ''
+        current_phone = ''
+        current_login = 'user'
+    
+    print(f"\nТекущие настройки:")
+    print(f"1. API_ID: {'*'*len(current_api_id) if current_api_id else 'Не задан'}")
+    print(f"2. API_HASH: {'*'*len(current_api_hash) if current_api_hash else 'Не задан'}")
+    print(f"3. PHONE: {current_phone if current_phone else 'Не задан'}")
+    print(f"4. LOGIN: {current_login}")
+    
+    print("\nВыберите параметр для изменения (1-4) или 0 для возврата в меню:")
+    choice = input("> ")
+    
+    if choice == "1":
+        new_api_id = input("Введите API_ID (числовой ID): ")
+        if new_api_id.strip():
+            update_env_value("API_ID", new_api_id)
+            print("✅ API_ID успешно обновлен")
+    
+    elif choice == "2":
+        new_api_hash = input("Введите API_HASH (строка): ")
+        if new_api_hash.strip():
+            update_env_value("API_HASH", new_api_hash)
+            print("✅ API_HASH успешно обновлен")
+    
+    elif choice == "3":
+        new_phone = input("Введите номер телефона (с кодом страны, например +7xxxxxxxxxx): ")
+        if new_phone.strip():
+            update_env_value("PHONE", new_phone)
+            print("✅ PHONE успешно обновлен")
+    
+    elif choice == "4":
+        new_login = input("Введите логин (используется для имени файла сессии): ")
+        if new_login.strip():
+            update_env_value("LOGIN", new_login)
+            print("✅ LOGIN успешно обновлен")
+    
+    elif choice == "0":
+        return
+    
+    else:
+        print("Неверный выбор")
+    
+    # Удаляем существующий файл сессии, если были изменены API_ID, API_HASH или PHONE
+    if choice in ["1", "2", "3"]:
+        session_dir = os.path.join(os.path.dirname(__file__), 'src', 'bot', 'session')
+        if os.path.exists(session_dir):
+            for file in os.listdir(session_dir):
+                if file.endswith(".session"):
+                    os.remove(os.path.join(session_dir, file))
+                    print(f"Файл сессии {file} удален для применения новых настроек")
+
 async def main():
     data_processor = DataProcessor()
-    config = load_config()
+    config_data = load_config()
     
     # Безопасная инициализация ModelTrainer с проверкой поддержки device
     try:
-        model_trainer = ModelTrainer(device=config.get("training_device"))
+        model_trainer = ModelTrainer(device=config_data.get("training_device"))
     except TypeError:
         print("Предупреждение: Ваша версия ModelTrainer не поддерживает выбор устройства. Используется CPU.")
         model_trainer = ModelTrainer()  # Пробуем без аргумента device
@@ -175,7 +260,7 @@ async def main():
                 print(f"{i}. {dataset['name']} ({dataset['type'].upper()})")
             
             try:
-                file_idx = int(input("\nВыберите дат��сет для обучения (номер): ")) - 1
+                file_idx = int(input("\nВ��берите датасет для обучения (номер): ")) - 1
                 if 0 <= file_idx < len(datasets):
                     selected_dataset = datasets[file_idx]
                     
@@ -207,7 +292,7 @@ async def main():
                 print("Пожалуйста, введите число")
 
         elif choice == "2":
-            print("\nВыберите JSON файл для конвертации в датасет")
+            print("\nВыберите JSON файл для конвертации в дат��сет")
             
             json_file_path = select_json_file()
             
@@ -245,7 +330,7 @@ async def main():
                 print(f"   Обучающих пар: {metadata.get('training_pairs_count', 'Неизвестно')}")
                 print(f"   Устройство обучения: {metadata.get('training_device', 'Неизвестно')}")
                 
-                if config.get("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
+                if config_data.get("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
                     print("   ✅ ТЕКУЩАЯ МОДЕЛЬ")
         
         elif choice == "4":
@@ -260,7 +345,7 @@ async def main():
                 metadata = model["metadata"]
                 print(f"{i}. {model['name']} (Пользователь: {metadata.get('target_user', 'Неизвестно')})")
                 
-                if config.get("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
+                if config_data.get("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
                     print("   ✅ ТЕКУЩАЯ МОДЕЛЬ")
             
             try:
@@ -271,8 +356,8 @@ async def main():
                     
                     test_generator = ResponseGenerator()
                     if test_generator.load_model(model_path):
-                        config["selected_model"] = model_path
-                        save_config(config)
+                        config_data["selected_model"] = model_path
+                        save_config(config_data)
                         print(f"\n✅ Модель успешно выбрана: {selected_model['name']}")
                         print(f"   Пользователь: {selected_model['metadata'].get('target_user', 'Неизвестно')}")
                     else:
@@ -290,7 +375,7 @@ async def main():
         elif choice == "6":
             print("Запуск Telegram клиента...")
             
-            model_path = config.get("selected_model")
+            model_path = config_data.get("selected_model")
             if not model_path:
                 models = model_trainer.list_trained_models()
                 if models:
@@ -299,13 +384,35 @@ async def main():
                 else:
                     print("\n❌ Нет доступных моделей. Сначала обучите модель.")
                     continue
-                    
-            responder = TelegramResponder(model_path)
+            
             try:
-                await responder.start()
-            except KeyboardInterrupt:
-                await responder.stop()
-                print("Клиент остановлен")
+                # Проверка минимальной конфигурации перед запуском
+                try:
+                    api_id = config('API_ID')
+                    api_hash = config('API_HASH')
+                    phone = config('PHONE')
+                except UndefinedValueError as e:
+                    print(f"\n❌ Отсутствует обязательный параметр в .env файле: {e}")
+                    print("Используйте пункт 8 для настройки Telegram API.")
+                    continue
+                
+                responder = TelegramResponder(model_path)
+                try:
+                    await responder.start()
+                except ValueError as e:
+                    print(f"\n❌ Ошибка конфигурации: {e}")
+                    print("Используйте пункт 8 для настройки Telegram API.")
+                except KeyboardInterrupt:
+                    print("\n⚠️ Остановка клиента...")
+                    await responder.stop()
+                    print("Клиент остановлен")
+                except Exception as e:
+                    print(f"\n❌ Ошибка при работе клиента: {e}")
+                    if hasattr(responder, "stop"):
+                        await responder.stop()
+                    
+            except Exception as e:
+                print(f"\n❌ Не удалось запустить Telegram клиент: {e}")
         
         elif choice == "7":
             # Проверяем поддержку выбора устройства
@@ -313,14 +420,17 @@ async def main():
                 select_training_device(model_trainer)
             else:
                 print("\n❌ Ваша версия программы не поддерживает выбор устройства обучения.")
-                print("Пожалуйста, убедитесь, что установлена последняя версия.")
+                print("Пожалуйста, убедитесь, что установлена последняя верс��я.")
         
         elif choice == "8":
+            configure_telegram_api()
+        
+        elif choice == "9":
             print("Выход из программы...")
             break
         
         else:
-            print("Неверный выбо��. Пожалуйста, выберите 1-8")
+            print("Неверный выбор. Пожалуйста, выберите 1-9")
 
 if __name__ == "__main__":
     asyncio.run(main())

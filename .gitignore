@@ -39,4 +39,4 @@ logs/
 .AppleDouble
 .LSOverride
 
-config/
+*/config.json

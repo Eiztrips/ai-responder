@@ -104,7 +104,7 @@ class ResponseGenerator:
         with torch.no_grad():
             output = self.model.generate(
                 inputs,
-                max_length=30,
+                max_length=50,
                 num_return_sequences=1,
                 pad_token_id=self.tokenizer.eos_token_id,
                 do_sample=True,

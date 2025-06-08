@@ -69,10 +69,13 @@ def display_menu():
 def select_json_file():
     root = tk.Tk()
     root.withdraw()
+    root.wm_attributes('-topmost', 1)
+    root.update()
     file_path = filedialog.askopenfilename(
         title="Выберите JSON файл",
         filetypes=[("JSON files", "*.json")]
     )
+    root.destroy()
     return file_path if file_path else None
 
 def change_bot_mode():

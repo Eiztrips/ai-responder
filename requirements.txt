@@ -1,0 +1,10 @@
+pyrogram>=2.0.0
+tgcrypto>=1.2.0
+python-decouple>=3.0.0
+torch>=2.1.0
+transformers>=4.30.0
+numpy>=1.0.0
+datasets>=2.0.0
+bitsandbytes>=0.0.0
+evaluate>=0.0.0
+accelerate>=0.20.0

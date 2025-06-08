@@ -86,16 +86,8 @@ class ResponseGenerator:
         return self.load_model(latest_model)
     
     def clean_response(self, text):
-        """
-        Очищает ответ от маркеров и неадекватных фрагментов.
-        """
-        # Удаляем все маркеры типа @@ТЕКСТ@@
         text = re.sub(r'@@[^@]*@@', '', text)
-        
-        # Удаляем префиксы в начале строк (E:, A:, Q: и т.д.)
         text = re.sub(r'(?m)^[A-Z]:\s*', '', text)
-        
-        # Удаляем лишние пробелы и переносы строк
         text = re.sub(r'\s+', ' ', text).strip()
         
         return text

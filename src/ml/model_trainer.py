@@ -118,9 +118,9 @@ class ModelTrainer:
                 logging_steps=50,
                 fp16=False,
                 optim="adamw_torch",
-                learning_rate=5e-5,  # Изменить на 2e-5
+                learning_rate=5e-5,
                 warmup_steps=100,
-                weight_decay=0.01,  # Изменить на 0.02
+                weight_decay=0.01,
                 lr_scheduler_type="cosine",
                 report_to="none",
                 dataloader_num_workers=0,

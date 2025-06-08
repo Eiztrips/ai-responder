@@ -72,7 +72,7 @@ class TelegramResponder:
 
         if not message.text:
             return
-            
+
         if self.mode == "only_private_chats":
             if message.chat.type == ChatType.PRIVATE:
                 if -1 in self.target_user_ids or message.from_user.id in self.target_user_ids:

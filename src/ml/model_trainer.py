@@ -48,11 +48,9 @@ class ModelTrainer:
     def __init__(self, device=None):
         self.model_dir = os.path.join(os.path.dirname(__file__), 'trained_models')
         self.data_processor = DataProcessor()
-        
-        # Определяем доступные устройства
+
         self.available_devices = self._get_available_devices()
-        
-        # Используем устройство из параметра или автоматический выбор
+
         if device and device in self.available_devices:
             self.device = device
         else:
@@ -64,19 +62,15 @@ class ModelTrainer:
             os.makedirs(self.model_dir)
     
     def _get_available_devices(self) -> Dict[str, bool]:
-        """Определяет доступные устройства для обучения"""
-        devices = {"cpu": True}  # CPU всегда доступен
-        
-        # Проверяем доступность CUDA (NVIDIA GPU)
+        devices = {"cpu": True}
+
         devices["cuda"] = torch.cuda.is_available()
-        
-        # Проверяем доступность MPS (Apple Silicon)
+
         devices["mps"] = torch.backends.mps.is_available()
         
         return devices
     
     def _get_default_device(self) -> str:
-        """Выбирает оптимальное устройство по умолчанию"""
         if self.available_devices.get("cuda", False):
             return "cuda"
         elif self.available_devices.get("mps", False):
@@ -85,7 +79,6 @@ class ModelTrainer:
             return "cpu"
     
     def _setup_device(self):
-        """Настраивает выбранное устройство"""
         if self.device == "mps":
             torch.mps.set_per_process_memory_fraction(0.7)
             logger.info(f"Используется Apple MPS ускоритель на {torch.mps.current_allocated_memory()/1024/1024:.2f} МБ памяти GPU")
@@ -105,7 +98,6 @@ class ModelTrainer:
             torch.cuda.empty_cache()
     
     def get_available_devices(self) -> Dict[str, str]:
-        """Возвращает словарь доступных устройств с их описанием"""
         device_names = {
             "cpu": "Процессор (CPU)",
             "cuda": "NVIDIA GPU (CUDA)",
@@ -120,7 +112,6 @@ class ModelTrainer:
         return available
     
     def set_device(self, device: str) -> bool:
-        """Устанавливает устройство для обучения"""
         if device in self.available_devices and self.available_devices[device]:
             self.device = device
             self._setup_device()
@@ -128,7 +119,6 @@ class ModelTrainer:
         return False
     
     def get_current_device(self) -> str:
-        """Возвращает текущее устройство обучения"""
         return self.device
     
     def train_model(self, dataset_info: Dict, target_user_id: str) -> str:
@@ -148,14 +138,13 @@ class ModelTrainer:
         if len(training_data) < 5:
             logger.error("Недостаточно данных для обучения.")
             return "Недостаточно данных для обучения. Нужно минимум 5 пар диалогов."
-        
-        # Настраиваем размер батча в зависимости от устройства
+
         if self.device == "cuda":
-            batch_size = 2  # Для NVIDIA GPU
+            batch_size = 2
         elif self.device == "mps":
-            batch_size = 1  # Для Apple Silicon
+            batch_size = 1
         else:
-            batch_size = 1  # Для CPU
+            batch_size = 1
         
         try:
             model_name = "tinkoff-ai/ruDialoGPT-small"
@@ -164,12 +153,12 @@ class ModelTrainer:
             tokenizer = AutoTokenizer.from_pretrained(model_name)
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
-            
-            # Установка dtype в зависимости от устройства
+
             if self.device == "cuda":
-                dtype = torch.float16  # half precision для NVIDIA GPU
+                model = AutoModelForCausalLM.from_pretrained(model_name)
+                model.to(self.device)
             else:
-                dtype = torch.float32  # full precision для CPU и MPS
+                dtype = torch.float32
             
             model = AutoModelForCausalLM.from_pretrained(model_name, 
                                                         torch_dtype=dtype)
@@ -197,7 +186,7 @@ class ModelTrainer:
                 save_steps=500,
                 save_total_limit=1,
                 logging_steps=50,
-                fp16=self.device == "cuda",  # только для NVIDIA GPU
+                fp16=self.device == "cuda",
                 optim="adamw_torch",
                 learning_rate=5e-5,
                 warmup_steps=100,

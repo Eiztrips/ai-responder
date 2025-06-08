@@ -12,6 +12,9 @@ if __name__ == "__main__":
     gc.collect()
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
+        print(f"Apple Silicon GPU (MPS) обнаружена и будет использоваться для обучения")
+    else:
+        print("MPS недоступен, будет использоваться CPU")
 
     logging.basicConfig(
         level=logging.INFO,

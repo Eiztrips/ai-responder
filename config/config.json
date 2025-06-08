@@ -1,3 +1,4 @@
 {
-  "selected_model": ""
+  "selected_model": "",
+  "training_device": "cpu"
 }

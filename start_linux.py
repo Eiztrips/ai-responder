@@ -12,6 +12,11 @@ if __name__ == "__main__":
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+        device_name = torch.cuda.get_device_name(0)
+        device_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        print(f"NVIDIA GPU обнаружена: {device_name} ({device_memory:.1f} ГБ)")
+    else:
+        print("NVIDIA GPU не обнаружена, будет использоваться CPU")
 
     logging.basicConfig(
         level=logging.INFO,

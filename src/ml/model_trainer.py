@@ -6,6 +6,7 @@ from src.utils.data_processor import DataProcessor
 from typing import List, Tuple, Dict
 import json
 import logging
+import platform
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -44,27 +45,95 @@ class ConversationDataset(Dataset):
         }
 
 class ModelTrainer:
-    def __init__(self):
+    def __init__(self, device=None):
         self.model_dir = os.path.join(os.path.dirname(__file__), 'trained_models')
         self.data_processor = DataProcessor()
         
-        if torch.backends.mps.is_available():
-            self.device = "mps"
-            torch.mps.set_per_process_memory_fraction(0.7)
-            logger.info(f"Используется Apple MPS ускоритель на {torch.mps.current_allocated_memory()/1024/1024:.2f} МБ памяти GPU")
-        else:
-            self.device = "cpu"
-            logger.info("MPS недоступен, используется CPU")
+        # Определяем доступные устройства
+        self.available_devices = self._get_available_devices()
         
-        import gc
-        gc.collect()
-        torch.mps.empty_cache() if self.device == "mps" else None
+        # Используем устройство из параметра или автоматический выбор
+        if device and device in self.available_devices:
+            self.device = device
+        else:
+            self.device = self._get_default_device()
+        
+        self._setup_device()
         
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
     
+    def _get_available_devices(self) -> Dict[str, bool]:
+        """Определяет доступные устройства для обучения"""
+        devices = {"cpu": True}  # CPU всегда доступен
+        
+        # Проверяем доступность CUDA (NVIDIA GPU)
+        devices["cuda"] = torch.cuda.is_available()
+        
+        # Проверяем доступность MPS (Apple Silicon)
+        devices["mps"] = torch.backends.mps.is_available()
+        
+        return devices
+    
+    def _get_default_device(self) -> str:
+        """Выбирает оптимальное устройство по умолчанию"""
+        if self.available_devices.get("cuda", False):
+            return "cuda"
+        elif self.available_devices.get("mps", False):
+            return "mps"
+        else:
+            return "cpu"
+    
+    def _setup_device(self):
+        """Настраивает выбранное устройство"""
+        if self.device == "mps":
+            torch.mps.set_per_process_memory_fraction(0.7)
+            logger.info(f"Используется Apple MPS ускоритель на {torch.mps.current_allocated_memory()/1024/1024:.2f} МБ памяти GPU")
+        elif self.device == "cuda":
+            torch.cuda.empty_cache()
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            logger.info(f"Используется NVIDIA GPU: {gpu_name} с {gpu_memory:.1f} ГБ памяти")
+        else:
+            logger.info("Используется CPU для обучения")
+        
+        import gc
+        gc.collect()
+        if self.device == "mps":
+            torch.mps.empty_cache()
+        elif self.device == "cuda":
+            torch.cuda.empty_cache()
+    
+    def get_available_devices(self) -> Dict[str, str]:
+        """Возвращает словарь доступных устройств с их описанием"""
+        device_names = {
+            "cpu": "Процессор (CPU)",
+            "cuda": "NVIDIA GPU (CUDA)",
+            "mps": "Apple Silicon GPU (MPS)"
+        }
+        
+        available = {}
+        for device, is_available in self.available_devices.items():
+            if is_available:
+                available[device] = device_names.get(device, device)
+        
+        return available
+    
+    def set_device(self, device: str) -> bool:
+        """Устанавливает устройство для обучения"""
+        if device in self.available_devices and self.available_devices[device]:
+            self.device = device
+            self._setup_device()
+            return True
+        return False
+    
+    def get_current_device(self) -> str:
+        """Возвращает текущее устройство обучения"""
+        return self.device
+    
     def train_model(self, dataset_info: Dict, target_user_id: str) -> str:
         logger.info(f"Начинаем обучение на файле: {dataset_info['name']} для пользователя с ID {target_user_id}")
+        logger.info(f"Используется устройство: {self.device}")
         
         data = self.data_processor.load_dataset(dataset_info)
         conversation = self.data_processor.extract_conversation(data)
@@ -80,7 +149,13 @@ class ModelTrainer:
             logger.error("Недостаточно данных для обучения.")
             return "Недостаточно данных для обучения. Нужно минимум 5 пар диалогов."
         
-        batch_size = 1 if self.device == "mps" else 1
+        # Настраиваем размер батча в зависимости от устройства
+        if self.device == "cuda":
+            batch_size = 2  # Для NVIDIA GPU
+        elif self.device == "mps":
+            batch_size = 1  # Для Apple Silicon
+        else:
+            batch_size = 1  # Для CPU
         
         try:
             model_name = "tinkoff-ai/ruDialoGPT-small"
@@ -89,9 +164,15 @@ class ModelTrainer:
             tokenizer = AutoTokenizer.from_pretrained(model_name)
             if tokenizer.pad_token is None:
                 tokenizer.pad_token = tokenizer.eos_token
-                
+            
+            # Установка dtype в зависимости от устройства
+            if self.device == "cuda":
+                dtype = torch.float16  # half precision для NVIDIA GPU
+            else:
+                dtype = torch.float32  # full precision для CPU и MPS
+            
             model = AutoModelForCausalLM.from_pretrained(model_name, 
-                                                        torch_dtype=torch.float32)
+                                                        torch_dtype=dtype)
             
             if hasattr(model, "config"):
                 model.config.use_cache = False
@@ -110,13 +191,13 @@ class ModelTrainer:
             training_args = TrainingArguments(
                 output_dir=model_save_path,
                 overwrite_output_dir=True,
-                num_train_epochs=3,  # Изменить на 4
+                num_train_epochs=3,
                 per_device_train_batch_size=batch_size,
                 gradient_accumulation_steps=8,
                 save_steps=500,
                 save_total_limit=1,
                 logging_steps=50,
-                fp16=False,
+                fp16=self.device == "cuda",  # только для NVIDIA GPU
                 optim="adamw_torch",
                 learning_rate=5e-5,
                 warmup_steps=100,
@@ -146,14 +227,18 @@ class ModelTrainer:
                 "source_file": dataset_info['name'],
                 "source_file_type": dataset_info['type'],
                 "training_pairs_count": len(training_data),
-                "model_size": model_name
+                "model_size": model_name,
+                "training_device": self.device
             }
             
             with open(os.path.join(model_save_path, "metadata.json"), "w", encoding="utf-8") as f:
                 json.dump(metadata, f, ensure_ascii=False, indent=2)
             
             del model, trainer, dataset
-            torch.mps.empty_cache() if self.device == "mps" else None
+            if self.device == "mps":
+                torch.mps.empty_cache()
+            elif self.device == "cuda":
+                torch.cuda.empty_cache()
             
             logger.info(f"Модель обучена и сохранена в {model_save_path}")
             return model_save_path

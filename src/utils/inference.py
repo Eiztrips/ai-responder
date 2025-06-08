@@ -16,7 +16,12 @@ class ResponseGenerator:
     def __init__(self, model_path=None):
         self.model = None
         self.tokenizer = None
-        if torch.backends.mps.is_available():
+        
+        # Определяем лучшее доступное устройство
+        if torch.cuda.is_available():
+            self.device = "cuda"
+            logger.info(f"Используется NVIDIA GPU: {torch.cuda.get_device_name(0)}")
+        elif torch.backends.mps.is_available():
             self.device = "mps"
             torch.mps.set_per_process_memory_fraction(0.7)
             logger.info(f"Используется устройство MPS (Apple Silicon)")
@@ -40,7 +45,10 @@ class ResponseGenerator:
                 del self.model
                 del self.tokenizer
                 gc.collect()
-                torch.mps.empty_cache() if self.device == "mps" else None
+                if self.device == "mps":
+                    torch.mps.empty_cache()
+                elif self.device == "cuda":
+                    torch.cuda.empty_cache()
             
             logger.info(f"Загружаем модель из {model_path}...")
             
@@ -48,9 +56,12 @@ class ResponseGenerator:
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
                 
+            # Выбор dtype в зависимости от устройства
+            dtype = torch.float16 if self.device == "cuda" else torch.float32
+                
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_path, 
-                torch_dtype=torch.float32,
+                torch_dtype=dtype,
                 low_cpu_mem_usage=True
             )
             self.model.to(self.device)

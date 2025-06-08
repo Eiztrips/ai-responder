@@ -17,7 +17,7 @@ def load_config():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
-    return {"selected_model": None}
+    return {"selected_model": None, "training_device": None}
 
 def save_config(config):
     os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
@@ -37,7 +37,7 @@ def update_env_value(key, new_value):
     for i, line in enumerate(lines):
         # Ищем строку с нужным ключом
         if line.startswith(f"{key}=") or line.startswith(f"{key}="):
-            # Сохраняем комментарий, если есть
+            # ��охраняем комментарий, если есть
             comment = ""
             if "#" in line:
                 comment = line[line.find("#"):]
@@ -63,8 +63,9 @@ def display_menu():
     print("4. Выбрать модель для использования")
     print("5. Изменить режим работы Telegram клиента")
     print("6. Запустить Telegram клиент")
-    print("7. Выход")
-    return input("Выберите опцию (1-7): ")
+    print("7. Выбрать устройство для обучения")
+    print("8. Выход")
+    return input("Выберите опцию (1-8): ")
 
 def select_json_file():
     root = tk.Tk()
@@ -111,10 +112,46 @@ def change_bot_mode():
         print("Неверный выбор.")
         return False
 
+def select_training_device(model_trainer):
+    """Меню выбора устройства для обучения"""
+    config = load_config()
+    current_device = config.get("training_device", model_trainer.get_current_device())
+    
+    print("\n===== Выбор устройства для обуче��ия =====")
+    print(f"Текущее устройство: {current_device}")
+    
+    available_devices = model_trainer.get_available_devices()
+    
+    print("\nДоступные устройства:")
+    options = list(available_devices.items())
+    for i, (device_id, device_name) in enumerate(options, 1):
+        print(f"{i}. {device_name} ({'текущее' if device_id == current_device else 'доступно'})")
+    
+    try:
+        choice = int(input("\nВыберите устройство (номер) или 0 для отмены: "))
+        
+        if choice == 0:
+            print("Выбор устройства отменен.")
+            return
+        
+        if 1 <= choice <= len(options):
+            selected_device = options[choice-1][0]
+            if model_trainer.set_device(selected_device):
+                config["training_device"] = selected_device
+                save_config(config)
+                print(f"\n✅ Устройство для обучения изменено на: {available_devices[selected_device]}")
+            else:
+                print("\n❌ Не удалось установить выбранное устройство.")
+        else:
+            print("Неверный выбор.")
+            
+    except ValueError:
+        print("Пожалуйста, введит�� число.")
+
 async def main():
     data_processor = DataProcessor()
-    model_trainer = ModelTrainer()
     config = load_config()
+    model_trainer = ModelTrainer(device=config.get("training_device"))
     
     while True:
         choice = display_menu()
@@ -140,15 +177,21 @@ async def main():
                     
                     print("\nДоступные пользователи для имитации:")
                     for i, user in enumerate(participants, 1):
-                        print(f"{i}. {user['name']} (Сообщений: {user['message_count']})")
+                        print(f"{i}. {user['name']} (Со��бщений: {user['message_count']})")
                     
                     user_idx = int(input("\nВыберите пользователя для имитации (номер): ")) - 1
                     if 0 <= user_idx < len(participants):
                         selected_user = participants[user_idx]
                         print(f"\nВыбран пользователь: {selected_user['name']} с ID {selected_user['id']}")
                         
-                        model_path = model_trainer.train_model(selected_dataset, selected_user['id'])
-                        print(f"Модель успешно обучена и сохранена: {model_path}")
+                        # Показываем текущее устройство
+                        current_device = model_trainer.get_current_device()
+                        available_devices = model_trainer.get_available_devices()
+                        print(f"\nТекущее устройство для обучения: {available_devices.get(current_device, current_device)}")
+                        
+                        if input("Начать обучение? (д/н): ").lower() in ['д', 'y', 'yes', 'да']:
+                            model_path = model_trainer.train_model(selected_dataset, selected_user['id'])
+                            print(f"Модель успешно обучена и сохранена: {model_path}")
                     else:
                         print("Неверный выбор пользователя")
                 else:
@@ -193,6 +236,7 @@ async def main():
                 print(f"   Пользователь: {metadata.get('target_user', 'Неизвестно')}")
                 print(f"   Исходный файл: {metadata.get('source_file', 'Неизвестно')} ({metadata.get('source_file_type', 'unknown').upper()})")
                 print(f"   Обучающих пар: {metadata.get('training_pairs_count', 'Неизвестно')}")
+                print(f"   Устройство обучения: {metadata.get('training_device', 'Неизвестно')}")
                 
                 if config.get("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
                     print("   ✅ ТЕКУЩАЯ МОДЕЛЬ")
@@ -257,11 +301,14 @@ async def main():
                 print("Клиент остановлен")
         
         elif choice == "7":
+            select_training_device(model_trainer)
+        
+        elif choice == "8":
             print("Выход из программы...")
             break
         
         else:
-            print("Неверный выбор. Пожалуйста, выберите 1-7")
+            print("Неверный выбор. Пожалуйста, выберите 1-8")
 
 if __name__ == "__main__":
     asyncio.run(main())

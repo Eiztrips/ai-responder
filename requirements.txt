@@ -1,7 +1,7 @@
 pyrogram>=2.0.0
 tgcrypto>=1.2.0
 python-decouple>=3.0.0
---extra-index-url https://download.pytorch.org/whl/cu118
+# --extra-index-url https://download.pytorch.org/whl/cu118 # (cuda)
 torch==2.7.1
 transformers>=4.30.0
 numpy>=1.0.0

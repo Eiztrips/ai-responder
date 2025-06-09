@@ -27,7 +27,6 @@ class TelegramResponder:
             self.phone = config('PHONE')
             self.login = config('LOGIN')
 
-            # Проверка наличия и валидности конфигурационных данных
             if not self.api_id or not self.api_hash:
                 logger.error("API_ID или API_HASH отсутствуют в конфигурации")
                 raise ValueError("API_ID и API_HASH должны быть указаны в файле .env")
@@ -50,8 +49,7 @@ class TelegramResponder:
             
             self.session_path = os.path.join(os.path.dirname(__file__), 'session', self.login)
             os.makedirs(os.path.dirname(self.session_path), exist_ok=True)
-            
-            # Настройка клиента с таймаутами и попытками повтора
+
             self.client = Client(
                 self.session_path,
                 api_id=self.api_id,
@@ -161,8 +159,7 @@ class TelegramResponder:
                 
             print(f"✅ Бот успешно запущен и готов отвечать в {target_info}")
             print("Нажмите Ctrl+C для остановки.")
-            
-            # Получаем информацию о текущем пользователе для дополнительной проверки
+
             me = await self.client.get_me()
             logger.info(f"Подключен как: {me.first_name} {me.last_name} (@{me.username})")
             
@@ -179,8 +176,7 @@ class TelegramResponder:
             logger.error(f"Ошибка авторизации: {e}")
             print(f"❌ Ошибка авторизации Telegram: {e}")
             print("Проверьте правильность API_ID, API_HASH и PHONE в файле .env")
-            
-            # Удаляем файл сессии, чтобы пользователь мог перелогиниться
+
             try:
                 session_file = self.session_path + ".session"
                 if os.path.exists(session_file):

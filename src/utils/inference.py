@@ -16,8 +16,7 @@ class ResponseGenerator:
     def __init__(self, model_path=None):
         self.model = None
         self.tokenizer = None
-        
-        # Определяем лучшее доступное устройство
+
         if torch.cuda.is_available():
             self.device = "cuda"
             logger.info(f"Используется NVIDIA GPU: {torch.cuda.get_device_name(0)}")

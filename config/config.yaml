@@ -1,0 +1,205 @@
+app:
+  name: "AI-Responder"
+  version: "1.0.0"
+
+# === ВАЖНЫЕ НАСТРОЙКИ ДЛЯ БЫСТРОГО ДОСТУПА ===
+main_settings:
+  active_generation_profile: "creative"
+  model: "sberbank-ai/rugpt3small_based_on_gpt2"
+  telegram_mode: "only_private_chats"
+  training_device: "cpu"
+
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+telegram:
+  api_id:
+  api_hash: ""
+  phone: ""
+  login: ""
+  target_user_ids: []
+  target_channel_ids: []
+  mode: "only_private_chats"
+  mode_descriptions:
+    only_channel_messages: "отвечает на все сообщения в беседах (если target_channel_ids=[-1], только в указанных беседах)"
+    only_private_chats: "отвечает на все сообщения в личных чатах (если target_user_ids=[-1], только указанным пользователям)"
+    stalker: "отвечает на сообщения определенных пользователей из target_user_ids"
+
+ml:
+  model: "sberbank-ai/rugpt3small_based_on_gpt2"
+  config_path: "config/ml_config.yaml"
+
+inference:
+  device:
+    cuda_env_vars:
+      PYTORCH_MPS_HIGH_WATERMARK_RATIO: "0.0"
+    mps_memory_fraction: 0.7
+  model:
+    models_dir: 'trained_models'
+    generation_profiles:
+      creative:
+        max_length: 70
+        num_return_sequences: 1
+        do_sample: true
+        temperature: 1.2
+        top_p: 0.98
+        no_repeat_ngram_size: 2
+        repetition_penalty: 1.0
+        length_penalty: 1.0
+        early_stopping: false
+      precise:
+        max_length: 40
+        num_return_sequences: 1
+        do_sample: true
+        temperature: 0.7
+        top_p: 0.9
+        no_repeat_ngram_size: 4
+        repetition_penalty: 1.2
+        length_penalty: 1.2
+        early_stopping: true
+      balanced:
+        max_length: 60
+        num_return_sequences: 1
+        do_sample: true
+        temperature: 0.85
+        top_p: 0.92
+        no_repeat_ngram_size: 3
+        repetition_penalty: 1.15
+        length_penalty: 1.05
+        early_stopping: true
+      chatty:
+        max_length: 80
+        num_return_sequences: 1
+        do_sample: true
+        temperature: 1.0
+        top_p: 0.95
+        no_repeat_ngram_size: 2
+        repetition_penalty: 1.05
+        length_penalty: 0.9
+        early_stopping: false
+    generation:
+      max_length: 50
+      num_return_sequences: 1
+      do_sample: true
+      temperature: 0.9
+      top_p: 0.95
+      no_repeat_ngram_size: 3
+      repetition_penalty: 1.1
+      length_penalty: 1.1
+      early_stopping: true
+  cache:
+    max_size: 100
+    lru_maxsize: 128
+  active_profile: "creative"
+
+data_processor:
+  directories:
+    base_model_dir: 'model'
+    jsonl_dir: 'json'
+    csv_dir: 'csv'
+  message_validation:
+    min_words: 2
+  regex:
+    emoji_pattern: "[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F700-\U0001F77F\U0001F780-\U0001F7FF\U0001F800-\U0001F8FF\U0001F900-\U0001F9FF\U0001FA00-\U0001FA6F\U0001FA70-\U0001FAFF\U00002702-\U000027B0\U000024C2-\U0001F251\U0001f926-\U0001f937\U00010000-\U0010ffff\u200d\u2640-\u2642\u2600-\u2B55\u23cf\u23e9\u231a\u3030\ufe0f]+"
+    url_pattern: "https?://\\S+|www\\.\\S+"
+    mention_hashtag_pattern: "@\\S+|#\\S+"
+    whitespace_pattern: "\\s+"
+    control_chars_pattern: "[\\x00-\\x1F\\x7F-\\x9F]"
+    html_tags_pattern: "<[^>]+>"
+    system_message_pattern: "^(joined|left|pinned|changed|removed|added|created)"
+
+model_dir: 'trained_models'
+default_model: 'facebook/opt-125m'
+min_training_pairs: 5
+model_name_format: "{user}_model_{model}"
+mps_memory_fraction: 0.7
+
+device_priority:
+  - "cuda"
+  - "mps"
+  - "cpu"
+
+device_names:
+  cpu: "Процессор (CPU)"
+  cuda: "NVIDIA GPU (CUDA)"
+  mps: "Apple Silicon GPU (MPS)"
+
+batch_sizes:
+  cuda: 4
+  mps: 2
+  cpu: 1
+
+model_loading:
+  dtype: 'torch.float32'
+  trust_remote_code: true
+  use_cache: false
+  device_map: 'auto'
+
+dataset:
+  max_length: 512
+  prompt_format: "Q: {}\nA: {}"
+
+training_args:
+  mps:
+    output_dir: model_save_path
+    overwrite_output_dir: true
+    num_train_epochs: 3
+    per_device_train_batch_size: 1
+    gradient_accumulation_steps: 8
+    save_steps: 500
+    save_total_limit: 1
+    logging_steps: 50
+    fp16: false
+    bf16: false
+    optim: "adamw_torch"
+    learning_rate: 4e-5
+    warmup_steps: 100
+    weight_decay: 0.01
+    lr_scheduler_type: "cosine"
+    report_to: "none"
+    dataloader_num_workers: 0
+    gradient_checkpointing: true
+    torch_compile: false
+
+  cuda:
+    output_dir: model_save_path
+    overwrite_output_dir: true
+    num_train_epochs: 3
+    per_device_train_batch_size: 4
+    gradient_accumulation_steps: 2
+    save_steps: 500
+    save_total_limit: 1
+    logging_steps: 50
+    fp16: true
+    bf16: "torch.cuda.is_bf16_supported()"
+    optim: "adamw_torch_fused"
+    learning_rate: 5e-5
+    warmup_steps: 100
+    weight_decay: 0.01
+    lr_scheduler_type: "cosine"
+    report_to: "tensorboard"
+    dataloader_num_workers: "os.cpu_count()"
+    gradient_checkpointing: false
+    torch_compile: true
+
+  cpu:
+    output_dir: model_save_path
+    overwrite_output_dir: true
+    num_train_epochs: 2
+    per_device_train_batch_size: 1
+    gradient_accumulation_steps: 4
+    save_steps: 300
+    save_total_limit: 1
+    logging_steps: 50
+    fp16: false
+    bf16: false
+    optim: "adamw_torch"
+    learning_rate: 3e-5
+    warmup_ratio: 0.1
+    weight_decay: 0.02
+    lr_scheduler_type: "linear"
+    report_to: "none"
+    dataloader_num_workers: "os.cpu_count()"
+    gradient_checkpointing: true
+    torch_compile: false

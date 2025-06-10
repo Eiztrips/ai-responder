@@ -1,6 +1,8 @@
 import os
 import logging
 import asyncio
+import yaml
+from pathlib import Path
 from pyrogram import Client
 from pyrogram.handlers import MessageHandler
 from pyrogram.enums import ChatAction, ChatType
@@ -11,41 +13,49 @@ from pyrogram.errors import (
 )
 
 from src.utils.inference import ResponseGenerator
-from decouple import config, UndefinedValueError
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 class TelegramResponder:
-    def __init__(self, model_path=None):
+    def __init__(self, config_manager=None, model_path=None):
         try:
-            self.api_id = config('API_ID')
-            self.api_hash = config('API_HASH')
-            self.phone = config('PHONE')
-            self.login = config('LOGIN')
+            if config_manager:
+                telegram_config = config_manager.get_telegram_config()
+                inference_config = config_manager.get_inference_config()
+                logging_config = config_manager.get_section('logging', {})
+                logging.basicConfig(level=getattr(logging, logging_config.get('level', 'INFO')),
+                                  format=logging_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            else:
+                # Backward compatibility
+                config_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / 'config' / 'config.yaml'
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                telegram_config = config['telegram']
+                inference_config = config['inference']
+                logging_config = config['logging']
+                logging.basicConfig(level=getattr(logging, logging_config['level']), format=logging_config['format'])
+                
+            self.logger = logging.getLogger(__name__)
+            
+            self.api_id = telegram_config['api_id']
+            self.api_hash = telegram_config['api_hash']
+            self.phone = telegram_config['phone']
+            self.login = telegram_config['login']
 
             if not self.api_id or not self.api_hash:
-                logger.error("API_ID или API_HASH отсутствуют в конфигурации")
-                raise ValueError("API_ID и API_HASH должны быть указаны в файле .env")
+                self.logger.error("API_ID или API_HASH отсутствуют в конфигурации")
+                raise ValueError("API_ID и API_HASH должны быть указаны в config.yaml")
                 
             if not self.phone or len(self.phone) < 5:
-                logger.error(f"Неверный номер телефона в конфигурации: {self.phone}")
-                raise ValueError("Номер телефона должен быть указан в файле .env")
+                self.logger.error(f"Неверный номер телефона в конфигурации: {self.phone}")
+                raise ValueError("Номер телефона должен быть указан в config.yaml")
                 
             if not self.login:
-                logger.warning("LOGIN не указан, будет использовано значение 'user'")
+                self.logger.warning("LOGIN не указан, будет использовано значение 'user'")
                 self.login = 'user'
                 
-            target_user_ids_raw = config('TARGET_USER_IDS', default='-1')
-            target_channel_ids_raw = config('TARGET_CHANNEL_IDS', default='-1')
-
-            self.target_user_ids = [int(uid.strip()) for uid in target_user_ids_raw.split('#')[0].split(',') if uid.strip()]
-            self.target_channel_ids = [int(cid.strip()) for cid in target_channel_ids_raw.split('#')[0].split(',') if cid.strip()]
+            self.target_user_ids = telegram_config.get('target_user_ids', [-1])
+            self.target_channel_ids = telegram_config.get('target_channel_ids', [-1])
             
-            self.mode = config('MODE', default='only_private_chats')
+            self.mode = telegram_config.get('mode', 'only_private_chats')
             
             self.session_path = os.path.join(os.path.dirname(__file__), 'session', self.login)
             os.makedirs(os.path.dirname(self.session_path), exist_ok=True)
@@ -61,23 +71,23 @@ class TelegramResponder:
                 sleep_threshold=10,
             )
             
-            self.response_generator = ResponseGenerator(model_path)
+            self.response_generator = ResponseGenerator(model_path, config_manager)
             self.model_info = self._get_model_info()
             
             self.is_running = False
             
-            logger.info(f"TelegramResponder инициализирован с моделью: {self.model_info}")
-            logger.info(f"Режим работы: {self.mode}")
-            logger.info(f"Целевые пользователи: {self.target_user_ids}")
-            logger.info(f"Целевые каналы/группы: {self.target_channel_ids}")
+            self.logger.info(f"TelegramResponder инициализирован с моделью: {self.model_info}")
+            self.logger.info(f"Режим работы: {self.mode}")
+            self.logger.info(f"Целевые пользователи: {self.target_user_ids}")
+            self.logger.info(f"Целевые каналы/группы: {self.target_channel_ids}")
             
-        except UndefinedValueError as e:
-            logger.error(f"Ошибка конфигурации: {e}")
-            self.config_error = f"Отсутствует необходимый параметр в файле .env: {str(e)}"
+        except KeyError as e:
+            self.logger.error(f"Ошибка конфигурации: отсутствует параметр {e}")
+            self.config_error = f"Отсутствует необходимый параметр в config.yaml: {str(e)}"
             raise ValueError(f"Ошибка конфигурации: {e}")
             
         except Exception as e:
-            logger.error(f"Ошибка инициализации TelegramResponder: {e}")
+            self.logger.error(f"Ошибка инициализации TelegramResponder: {e}")
             self.config_error = f"Ошибка инициализации: {str(e)}"
             raise
 
@@ -175,7 +185,7 @@ class TelegramResponder:
         except (AuthKeyUnregistered, BadRequest, Unauthorized) as e:
             logger.error(f"Ошибка авторизации: {e}")
             print(f"❌ Ошибка авторизации Telegram: {e}")
-            print("Проверьте правильность API_ID, API_HASH и PHONE в файле .env")
+            print("Проверьте правильность API_ID, API_HASH и PHONE в файле config.yaml")
 
             try:
                 session_file = self.session_path + ".session"
@@ -190,7 +200,7 @@ class TelegramResponder:
         except (PhoneNumberInvalid, PhoneCodeInvalid) as e:
             logger.error(f"Ошибка с номером телефона: {e}")
             print(f"❌ Проблема с номером телефона: {e}")
-            print("Проверьте правильность номера телефона в файле .env")
+            print("Проверьте правильность номера телефона в файле config.yaml")
             self.is_running = False
             
         except KeyboardInterrupt:

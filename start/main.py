@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2025 Eiztrips
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
 import json
 import yaml
@@ -11,7 +33,7 @@ from src.ml.model_trainer import ModelTrainer
 from src.utils.inference import ResponseGenerator
 from src.bot.telegram_client import TelegramResponder
 
-BASE_DIR = os.path.dirname(__file__)
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 CONFIG_FILE = os.path.join(BASE_DIR, 'config', 'config.json')
 YAML_CONFIG_FILE = os.path.join(BASE_DIR, 'config', 'config.yaml')
 
@@ -94,22 +116,17 @@ class ConfigManager:
         return self.yaml_config.get('data_processor', {})
     
     def get_full_config(self) -> Dict[str, Any]:
-        """Возвращает полную конфигурацию."""
         return self.yaml_config
 
     def update_yaml_setting(self, section: str, key: str, value: Any):
-        """Обновляет настройку в YAML конфигурации и синхронизирует с main_settings."""
-        # Обновление в основной секции
         if section not in self.yaml_config:
             self.yaml_config[section] = {}
         self.yaml_config[section][key] = value
-        
-        # Синхронизация с main_settings для быстрого доступа
+
         if section != 'main_settings':
             if 'main_settings' not in self.yaml_config:
                 self.yaml_config['main_settings'] = {}
-            
-            # Маппинг секций на ключи в main_settings
+
             mapping = {
                 'ml': {'model': 'model'},
                 'telegram': {'mode': 'telegram_mode'},
@@ -212,28 +229,22 @@ def settings_menu(config_manager: ConfigManager, model_trainer):
         choice = input("Выберите опцию (1-6): ")
 
         if choice == "1":
-            # Настройка профиля генерации текста
             _handle_generation_profile_settings(config_manager)
         elif choice == "2":
-            # Настройка модели по умолчанию
             _handle_default_model_settings(config_manager)
         elif choice == "3":
-            # Настройка режима работы Telegram-бота
             _handle_telegram_mode_settings(config_manager)
         elif choice == "4":
-            # Настройка устройства для обучения
             if hasattr(model_trainer, "get_available_devices"):
                 select_training_device(model_trainer, config_manager)
             else:
                 print("❌ Не поддерживается в вашей версии.")
         elif choice == "5":
-            # Сохранение всех настроек в YAML файл
             if config_manager.save_yaml_config():
                 print("\n✅ Все настройки успешно сохранены в файл конфигурации!")
             else:
                 print("\n❌ Не удалось сохранить настройки. Проверьте права доступа к файлу.")
         elif choice == "6":
-            # Возврат в главное меню
             if _prompt_for_save_if_needed(config_manager):
                 config_manager.save_yaml_config()
             break
@@ -242,34 +253,35 @@ def settings_menu(config_manager: ConfigManager, model_trainer):
             
 
 def _handle_generation_profile_settings(config_manager: ConfigManager):
-    """Управление настройками профиля генерации текста."""
     print("\n" + "-"*40)
     print("     ПРОФИЛИ ГЕНЕРАЦИИ ТЕКСТА")
     print("-"*40)
-    
-    yaml_cfg = config_manager.yaml_config
-    profiles = yaml_cfg.get("inference", {}).get("model", {}).get("generation_profiles", {})
-    
-    # Определяем активный профиль с учетом всех возможных путей в конфигурации
-    active = yaml_cfg.get("main_settings", {}).get("active_generation_profile") \
-        or yaml_cfg.get("inference", {}).get("active_profile", "creative")
-    
+
+    profiles = config_manager.yaml_config.get("inference", {}) \
+        .get("model", {}) \
+        .get("generation_profiles", {})
+
+    if not profiles:
+        print("❌ Не найдено ни одного профиля генерации в конфиге.")
+        print("DEBUG: inference.model.generation_profiles =", config_manager.yaml_config.get("inference", {}).get("model", {}).get("generation_profiles"))
+        print("DEBUG: Полный config['inference'] =", config_manager.yaml_config.get("inference"))
+        return
+
+    active = config_manager.yaml_config.get("main_settings", {}).get("active_generation_profile") \
+        or config_manager.yaml_config.get("inference", {}).get("active_profile", "creative")
+
     print("Доступные профили генерации:")
-    
     for i, key in enumerate(profiles, 1):
         current = "✓" if key == active else " "
+        profile = profiles[key]
         print(f"{i}. [{current}] {key}")
-        
-        # Показываем краткую информацию о профиле
-        profile = profiles.get(key, {})
-        print(f"   Длина: {profile.get('max_length', 'Не указано')}, " 
+        print(f"   Длина: {profile.get('max_length', 'Не указано')}, "
               f"Температура: {profile.get('temperature', 'Не указано')}")
-    
+
     idx = input("\nВыберите профиль (номер) или 0 для отмены: ")
-    
+
     if idx.isdigit() and 1 <= int(idx) <= len(profiles):
         selected = list(profiles.keys())[int(idx)-1]
-        # Обновляем настройку во всех необходимых местах
         config_manager.update_yaml_setting('inference', 'active_profile', selected)
         print(f"\n✅ Активный профиль изменен на: {selected}")
     elif idx == "0":
@@ -279,7 +291,6 @@ def _handle_generation_profile_settings(config_manager: ConfigManager):
 
 
 def _handle_default_model_settings(config_manager: ConfigManager):
-    """Управление настройками модели по умолчанию."""
     print("\n" + "-"*40)
     print("     НАСТРОЙКА МОДЕЛИ ПО УМОЛЧАНИЮ")
     print("-"*40)
@@ -297,7 +308,6 @@ def _handle_default_model_settings(config_manager: ConfigManager):
     new_model = input("\nВведите название модели (или Enter для отмены): ").strip()
     
     if new_model:
-        # Обновляем настройки модели во всех местах
         config_manager.update_yaml_setting('ml', 'model', new_model)
         print(f"\n✅ Модель изменена на: {new_model}")
     else:
@@ -305,7 +315,6 @@ def _handle_default_model_settings(config_manager: ConfigManager):
 
 
 def _handle_telegram_mode_settings(config_manager: ConfigManager):
-    """Управление настройками режима Telegram бота."""
     print("\n" + "-"*40)
     print("     НАСТРОЙКА РЕЖИМА TELEGRAM БОТА")
     print("-"*40)
@@ -313,8 +322,7 @@ def _handle_telegram_mode_settings(config_manager: ConfigManager):
     yaml_cfg = config_manager.yaml_config
     telegram_cfg = yaml_cfg.get("telegram", {})
     mode_descriptions = telegram_cfg.get("mode_descriptions", {})
-    
-    # Определяем текущий режим
+
     current_mode = yaml_cfg.get("main_settings", {}).get("telegram_mode") \
         or telegram_cfg.get("mode", "only_private_chats")
     
@@ -332,7 +340,7 @@ def _handle_telegram_mode_settings(config_manager: ConfigManager):
     if choice_mode.isdigit() and 1 <= int(choice_mode) <= len(modes):
         mode_idx = int(choice_mode) - 1
         new_mode = modes[mode_idx][0]
-        # Обновляем настройку режима
+
         config_manager.update_yaml_setting('telegram', 'mode', new_mode)
         print(f"\n✅ Режим успешно изменен на: {new_mode}")
     elif choice_mode == "0":
@@ -342,8 +350,6 @@ def _handle_telegram_mode_settings(config_manager: ConfigManager):
 
 
 def _prompt_for_save_if_needed(config_manager: ConfigManager) -> bool:
-    """Предлагает сохранить настройки, если были внесены изменения."""
-    # В будущем здесь можно добавить проверку, были ли внесены изменения
     response = input("\nСохранить изменения в файл конфигурации? (д/н): ")
     return response.lower() in ['д', 'y', 'yes', 'да']
 

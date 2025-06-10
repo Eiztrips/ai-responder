@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2025 Eiztrips
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
 import logging
 import asyncio
@@ -98,7 +120,7 @@ class TelegramResponder:
 
     async def _send_response(self, client, message):
         try:
-            logger.info(f"Получено сообщение от {message.from_user.first_name} ({message.from_user.id}): {message.text}")
+            self.logger.info(f"Получено сообщение от {message.from_user.first_name} ({message.from_user.id}): {message.text}")
             
             response = self.response_generator.generate_response(message.text)
             delay = min(len(response) * 0.1, 3)
@@ -107,13 +129,13 @@ class TelegramResponder:
             await asyncio.sleep(delay)
             await message.reply(response)
             
-            logger.info(f"Отправлен ответ: {response}")
+            self.logger.info(f"Отправлен ответ: {response}")
         except FloodWait as e:
-            logger.warning(f"FloodWait: Ожидаем {e.value} секунд перед повторной попыткой")
+            self.logger.warning(f"FloodWait: Ожидаем {e.value} секунд перед повторной попыткой")
             await asyncio.sleep(e.value)
             await self._send_response(client, message)
         except Exception as e:
-            logger.error(f"Ошибка при отправке ответа: {e}")
+            self.logger.error(f"Ошибка при отправке ответа: {e}")
 
     async def message_handler(self, client, message):
         if message.outgoing:
@@ -137,11 +159,11 @@ class TelegramResponder:
                 if message.from_user and message.from_user.id in self.target_user_ids:
                     await self._send_response(client, message)
         except Exception as e:
-            logger.error(f"Ошибка при обработке сообщения: {e}")
+            self.logger.error(f"Ошибка при обработке сообщения: {e}")
 
     async def start(self):
         if not self.response_generator.model:
-            logger.error("Нет загруженной модели. Не могу запустить клиент.")
+            self.logger.error("Нет загруженной модели. Не могу запустить клиент.")
             print("❌ Нет загруженной модели. Сначала обучите модель или выберите существующую.")
             return
         
@@ -156,9 +178,9 @@ class TelegramResponder:
         
         # Добавляем тайм-аут и обработку ошибок подключения
         try:
-            logger.info("Подключение к Telegram API...")
+            self.logger.info("Подключение к Telegram API...")
             await asyncio.wait_for(self.client.start(), timeout=60.0)
-            logger.info("Успешное подключение к Telegram API")
+            self.logger.info("Успешное подключение к Telegram API")
             
             if self.mode == "only_private_chats":
                 target_info = "всех личных чатах" if -1 in self.target_user_ids else f"личных чатах с пользователями {self.target_user_ids}"
@@ -171,19 +193,19 @@ class TelegramResponder:
             print("Нажмите Ctrl+C для остановки.")
 
             me = await self.client.get_me()
-            logger.info(f"Подключен как: {me.first_name} {me.last_name} (@{me.username})")
+            self.logger.info(f"Подключен как: {me.first_name} {me.last_name} (@{me.username})")
             
             while self.is_running:
                 await asyncio.sleep(1)
                 
         except asyncio.TimeoutError:
-            logger.error("Тайм-аут подключения к Telegram API")
+            self.logger.error("Тайм-аут подключения к Telegram API")
             print("❌ Не удалось подключиться к Telegram API: тайм-аут соединения")
             print("Проверьте ваше интернет-соединение и конфигурацию API")
             self.is_running = False
             
         except (AuthKeyUnregistered, BadRequest, Unauthorized) as e:
-            logger.error(f"Ошибка авторизации: {e}")
+            self.logger.error(f"Ошибка авторизации: {e}")
             print(f"❌ Ошибка авторизации Telegram: {e}")
             print("Проверьте правильность API_ID, API_HASH и PHONE в файле config.yaml")
 
@@ -191,26 +213,26 @@ class TelegramResponder:
                 session_file = self.session_path + ".session"
                 if os.path.exists(session_file):
                     os.remove(session_file)
-                    logger.info(f"Удален файл сессии: {session_file}")
+                    self.logger.info(f"Удален файл сессии: {session_file}")
             except Exception as ex:
-                logger.error(f"Ошибка при удалении файла сессии: {ex}")
+                self.logger.error(f"Ошибка при удалении файла сессии: {ex}")
                 
             self.is_running = False
             
         except (PhoneNumberInvalid, PhoneCodeInvalid) as e:
-            logger.error(f"Ошибка с номером телефона: {e}")
+            self.logger.error(f"Ошибка с номером телефона: {e}")
             print(f"❌ Проблема с номером телефона: {e}")
             print("Проверьте правильность номера телефона в файле config.yaml")
             self.is_running = False
             
         except KeyboardInterrupt:
-            logger.info("Получен сигнал прерывания")
+            self.logger.info("Получен сигнал прерывания")
             print("⚠️ Остановка по запросу пользователя...")
             self.is_running = False
             await self.stop()
             
         except Exception as e:
-            logger.exception(f"Непредвиденная ошибка при запуске клиента: {e}")
+            self.logger.exception(f"Непредвиденная ошибка при запуске клиента: {e}")
             print(f"❌ Произошла ошибка: {e}")
             self.is_running = False
             
@@ -224,10 +246,10 @@ class TelegramResponder:
             
         self.is_running = False
         try:
-            logger.info("Остановка клиента...")
+            self.logger.info("Остановка клиента...")
             await self.client.stop()
-            logger.info("Клиент успешно остановлен")
+            self.logger.info("Клиент успешно остановлен")
             print("✅ Клиент успешно остановлен")
         except Exception as e:
-            logger.error(f"Ошибка при остановке клиента: {e}")
+            self.logger.error(f"Ошибка при остановке клиента: {e}")
             print(f"⚠️ Проблема при остановке клиента: {e}")

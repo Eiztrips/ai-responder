@@ -143,7 +143,7 @@ class TelegramResponder:
 
         if not message.text:
             return
-
+        print(message.chat.type, message.chat.id, message.from_user.id, message.text)
         try:
             if self.mode == "only_private_chats":
                 if message.chat.type == ChatType.PRIVATE:

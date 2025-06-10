@@ -124,7 +124,6 @@ class ResponseGenerator:
     
     def load_latest_model(self):
         if not os.path.exists(self.models_dir):
-            self.logger.warning("Директория с моделями не найдена")
             return False
             
         model_dirs = [os.path.join(self.models_dir, d) for d in os.listdir(self.models_dir) 

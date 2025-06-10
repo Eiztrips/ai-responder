@@ -217,6 +217,16 @@ class ModelTrainer:
                         device_args[k] = eval(v)
                     elif v.startswith('torch.'):
                         device_args[k] = eval(v)
+                    elif k in ['lr', 'learning_rate', 'weight_decay', 'adam_epsilon', 'warmup_ratio']:
+                        try:
+                            device_args[k] = float(v)
+                        except ValueError:
+                            pass
+                    elif k in ['num_train_epochs', 'per_device_train_batch_size', 'per_device_eval_batch_size', 'seed']:
+                        try:
+                            device_args[k] = int(v)
+                        except ValueError:
+                            pass
 
             training_args = TrainingArguments(**device_args)
 

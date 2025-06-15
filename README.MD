@@ -67,8 +67,14 @@ AI Telegram Responder — инструмент для создания и обу
    ```bash
    # macOS
    python start/macos/start_macos.py
+   # либо
+   chmod +x start/macos/start_macos.sh
+   /macos/start_macos.sh
    # Linux
    python start/linux/start_linux.py
+   # либо
+   chmod +x start/linux/start_linux.sh
+   /linux/start_linux.sh
    # Windows
    python start/windows/start_windows.py
    ```

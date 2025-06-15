@@ -1,6 +1,6 @@
 app:
   name: "AI-Responder"
-  version: "1.0.0"
+  version: "2.1.0"
 
 main_settings:
   active_generation_profile: "creative"

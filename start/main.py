@@ -1,75 +1,121 @@
+# MIT License
+#
+# Copyright (c) 2025 Eiztrips
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
+import yaml
+import asyncio
+import tkinter as tk
+from tkinter import filedialog
+from typing import Dict, Any
+
 from src.utils.data_processor import DataProcessor
 from src.ml.model_trainer import ModelTrainer
 from src.utils.inference import ResponseGenerator
 from src.bot.telegram_client import TelegramResponder
-import asyncio
-from tkinter import filedialog
-import tkinter as tk
-import json
-from decouple import config, UndefinedValueError
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config', 'config.json')
-ENV_FILE = os.path.join(os.path.dirname(__file__), '.env')
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+YAML_CONFIG_FILE = os.path.join(BASE_DIR, 'config', 'config.yaml')
 
-def load_config():
-    if os.path.exists(CONFIG_FILE):
+class ConfigManager:
+
+    def __init__(self):
+        self.config = {}
+        self.yaml_config = self._load_yaml_config()
+
+    def _load_yaml_config(self) -> Dict[str, Any]:
+        if os.path.exists(YAML_CONFIG_FILE):
+            try:
+                with open(YAML_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    return yaml.safe_load(f)
+            except Exception as e:
+                print(f"Ошибка загрузки YAML конфигурации: {e}")
+        return {}
+
+    def save_yaml_config(self):
+        os.makedirs(os.path.dirname(YAML_CONFIG_FILE), exist_ok=True)
         try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except json.JSONDecodeError as e:
-            print(f"Ошибка в формате JSON файла конфигурации: {e}")
+            with open(YAML_CONFIG_FILE, 'w', encoding='utf-8') as f:
+                yaml.dump(self.yaml_config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            print(f"✅ Конфигурация успешно сохранена в {YAML_CONFIG_FILE}")
+            return True
         except Exception as e:
-            print(f"Не удалось загрузить конфигурацию: {e}")
-    return {"selected_model": None, "training_device": None}
+            print(f"❌ Не удалось сохранить YAML конфигурацию: {e}")
+            return False
 
-def save_config(config):
-    os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-    try:
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"Не удалось сохранить конфигурацию: {e}")
+    def get(self, section: str, key: str, default: Any = None) -> Any:
+        try:
+            if section in self.yaml_config and key in self.yaml_config[section]:
+                return self.yaml_config[section][key]
+            return default
+        except Exception:
+            return default
 
-def update_env_value(key, new_value):
-    if not os.path.exists(ENV_FILE):
-        print(f"Файл .env не найден по пути {ENV_FILE}")
-        return False
+    def get_section(self, section: str, default: Any = None) -> Any:
+        return self.yaml_config.get(section, default)
 
-    with open(ENV_FILE, 'r', encoding='utf-8') as file:
-        lines = file.readlines()
+    def get_app_config(self, key: str, default: Any = None) -> Any:
+        return self.yaml_config.get('main_settings', {}).get(key, default)
 
-    updated = False
-    for i, line in enumerate(lines):
-        if line.startswith(f"{key}=") or line.startswith(f"{key} ="):
-            comment = ""
-            if "#" in line:
-                comment = line[line.find("#"):]
+    def set_app_config(self, key: str, value: Any):
+        if 'main_settings' not in self.yaml_config:
+            self.yaml_config['main_settings'] = {}
+        self.yaml_config['main_settings'][key] = value
+        self.save_yaml_config()
 
-            lines[i] = f"{key}={new_value} {comment}" if comment else f"{key}={new_value}\n"
-            updated = True
-            break
+    def get_ml_config(self) -> Dict[str, Any]:
+        return self.yaml_config.get('ml', {})
 
-    if updated:
-        with open(ENV_FILE, 'w', encoding='utf-8') as file:
-            file.writelines(lines)
-        return True
-    else:
-        print(f"Ключ {key} не найден в файле .env")
-        return False
+    def get_telegram_config(self) -> Dict[str, Any]:
+        return self.yaml_config.get('telegram', {})
 
-def display_menu():
-    print("\n===== AI-Responder Menu =====")
-    print("1. Обучить новую модель")
-    print("2. Спарсить JSON файл в датасет")
-    print("3. Показать доступные модели")
-    print("4. Выбрать модель для использования")
-    print("5. Изменить режим работы Telegram клиента")
-    print("6. Запустить Telegram клиент")
-    print("7. Выбрать устройство для обучения")
-    print("8. Настроить Telegram API")
-    print("9. Выход")
-    return input("Выберите опцию (1-9): ")
+    def get_inference_config(self) -> Dict[str, Any]:
+        return self.yaml_config.get('inference', {})
+    
+    def get_data_processor_config(self) -> Dict[str, Any]:
+        return self.yaml_config.get('data_processor', {})
+    
+    def get_full_config(self) -> Dict[str, Any]:
+        return self.yaml_config
+
+    def update_yaml_setting(self, section: str, key: str, value: Any):
+        if section not in self.yaml_config:
+            self.yaml_config[section] = {}
+        self.yaml_config[section][key] = value
+
+        if section != 'main_settings':
+            if 'main_settings' not in self.yaml_config:
+                self.yaml_config['main_settings'] = {}
+
+            mapping = {
+                'ml': {'model': 'model'},
+                'telegram': {'mode': 'telegram_mode'},
+                'inference': {'active_profile': 'active_generation_profile'},
+                'main_settings': {}
+            }
+            
+            if section in mapping and key in mapping[section]:
+                main_key = mapping[section][key]
+                self.yaml_config['main_settings'][main_key] = value
+
 
 def select_json_file():
     root = tk.Tk()
@@ -83,32 +129,27 @@ def select_json_file():
     root.destroy()
     return file_path if file_path else None
 
-def change_bot_mode():
-    current_mode = config('MODE', default='only_private_chats')
+
+def change_bot_mode(config_manager: ConfigManager):
+    telegram_config = config_manager.get_telegram_config()
+    current_mode = telegram_config.get('mode', 'only_private_chats')
+    mode_descriptions = telegram_config.get('mode_descriptions', {})
 
     print("\n===== Изменение режима работы бота =====")
     print(f"Текущий режим: {current_mode}")
     print("\nДоступные режимы:")
-    print("1. only_private_chats - отвечать только в личных чатах")
-    print("2. only_channel_messages - отвечать только в беседах/группах")
-    print("3. stalker - отвечать пользователям из списка TARGET_USER_IDS в любых чатах")
+    
+    modes = list(mode_descriptions.items())
+    for i, (mode, description) in enumerate(modes, 1):
+        print(f"{i}. {mode} - {description}")
 
-    choice = input("\nВыберите режим (1-3) или 0 для отмены: ")
+    choice = input("\nВыберите режим (1-{}) или 0 для отмены: ".format(len(modes)))
 
-    mode_map = {
-        "1": "only_private_chats",
-        "2": "only_channel_messages",
-        "3": "stalker"
-    }
-
-    if choice in mode_map:
-        new_mode = mode_map[choice]
-        if update_env_value("MODE", new_mode):
-            print(f"\n✅ Режим успешно изменен на: {new_mode}")
-            return True
-        else:
-            print("\n❌ Не удалось изменить режим. Проверьте файл .env")
-            return False
+    if choice.isdigit() and 1 <= int(choice) <= len(modes):
+        mode_idx = int(choice) - 1
+        new_mode = modes[mode_idx][0]
+        print(f"\n✅ Режим успешно изменен на: {new_mode} (измените config.yaml для сохранения)")
+        return True
     elif choice == "0":
         print("Изменение режима отменено.")
         return False
@@ -116,9 +157,9 @@ def change_bot_mode():
         print("Неверный выбор.")
         return False
 
-def select_training_device(model_trainer):
-    config = load_config()
-    current_device = config.get("training_device", model_trainer.get_current_device())
+
+def select_training_device(model_trainer, config_manager: ConfigManager):
+    current_device = config_manager.get_app_config("training_device", model_trainer.get_current_device())
 
     print("\n===== Выбор устройства для обучения =====")
     print(f"Текущее устройство: {current_device}")
@@ -140,8 +181,7 @@ def select_training_device(model_trainer):
         if 1 <= choice <= len(options):
             selected_device = options[choice-1][0]
             if model_trainer.set_device(selected_device):
-                config["training_device"] = selected_device
-                save_config(config)
+                config_manager.set_app_config("training_device", selected_device)
                 print(f"\n✅ Устройство для обучения изменено на: {available_devices[selected_device]}")
             else:
                 print("\n❌ Не удалось установить выбранное устройство.")
@@ -151,92 +191,176 @@ def select_training_device(model_trainer):
     except ValueError:
         print("Пожалуйста, введите число.")
 
-def configure_telegram_api():
-    """Позволяет настроить параметры Telegram API"""
-    print("\n===== Настройка Telegram API =====")
+def settings_menu(config_manager: ConfigManager, model_trainer):
+    """Меню настроек с улучшенной читаемостью и функционалом сохранения."""
+    while True:
+        print("\n" + "="*40)
+        print("        НАСТРОЙКИ AI-RESPONDER")
+        print("="*40)
+        print("1. Профиль генерации текста")
+        print("2. Модель по умолчанию")
+        print("3. Режим Telegram-бота")
+        print("4. Устройство для обучения")
+        print("5. Сохранить все настройки")
+        print("6. Вернуться в главное меню")
+        print("="*40)
+        
+        choice = input("Выберите опцию (1-6): ")
 
-    if not os.path.exists(ENV_FILE):
-        with open(ENV_FILE, 'w', encoding='utf-8') as f:
-            f.write("# Telegram API Settings\n")
-            f.write("API_ID=\n")
-            f.write("API_HASH=\n")
-            f.write("PHONE=\n")
-            f.write("LOGIN=user\n\n")
-            f.write("# Bot Settings\n")
-            f.write("MODE=only_private_chats\n")
-            f.write("TARGET_USER_IDS=-1\n")
-            f.write("TARGET_CHANNEL_IDS=-1\n")
-        print("Создан новый файл .env с шаблоном настроек")
+        if choice == "1":
+            _handle_generation_profile_settings(config_manager)
+        elif choice == "2":
+            _handle_default_model_settings(config_manager)
+        elif choice == "3":
+            _handle_telegram_mode_settings(config_manager)
+        elif choice == "4":
+            if hasattr(model_trainer, "get_available_devices"):
+                select_training_device(model_trainer, config_manager)
+            else:
+                print("❌ Не поддерживается в вашей версии.")
+        elif choice == "5":
+            if config_manager.save_yaml_config():
+                print("\n✅ Все настройки успешно сохранены в файл конфигурации!")
+            else:
+                print("\n❌ Не удалось сохранить настройки. Проверьте права доступа к файлу.")
+        elif choice == "6":
+            if _prompt_for_save_if_needed(config_manager):
+                config_manager.save_yaml_config()
+            break
+        else:
+            print("❌ Неверный выбор. Пожалуйста, введите число от 1 до 6.")
+            
 
-    try:
-        current_api_id = config('API_ID', default='')
-        current_api_hash = config('API_HASH', default='')
-        current_phone = config('PHONE', default='')
-        current_login = config('LOGIN', default='user')
-    except:
-        current_api_id = ''
-        current_api_hash = ''
-        current_phone = ''
-        current_login = 'user'
+def _handle_generation_profile_settings(config_manager: ConfigManager):
+    print("\n" + "-"*40)
+    print("     ПРОФИЛИ ГЕНЕРАЦИИ ТЕКСТА")
+    print("-"*40)
 
-    print(f"\nТекущие настройки:")
-    print(f"1. API_ID: {'*'*len(current_api_id) if current_api_id else 'Не задан'}")
-    print(f"2. API_HASH: {'*'*len(current_api_hash) if current_api_hash else 'Не задан'}")
-    print(f"3. PHONE: {current_phone if current_phone else 'Не задан'}")
-    print(f"4. LOGIN: {current_login}")
+    profiles = config_manager.yaml_config.get("inference", {}) \
+        .get("model", {}) \
+        .get("generation_profiles", {})
 
-    print("\nВыберите параметр для изменения (1-4) или 0 для возврата в меню:")
-    choice = input("> ")
-
-    if choice == "1":
-        new_api_id = input("Введите API_ID (числовой ID): ")
-        if new_api_id.strip():
-            update_env_value("API_ID", new_api_id)
-            print("✅ API_ID успешно обновлен")
-
-    elif choice == "2":
-        new_api_hash = input("Введите API_HASH (строка): ")
-        if new_api_hash.strip():
-            update_env_value("API_HASH", new_api_hash)
-            print("✅ API_HASH успешно обновлен")
-
-    elif choice == "3":
-        new_phone = input("Введите номер телефона (с кодом страны, например +7xxxxxxxxxx): ")
-        if new_phone.strip():
-            update_env_value("PHONE", new_phone)
-            print("✅ PHONE успешно обновлен")
-
-    elif choice == "4":
-        new_login = input("Введите логин (используется для имени файла сессии): ")
-        if new_login.strip():
-            update_env_value("LOGIN", new_login)
-            print("✅ LOGIN успешно обновлен")
-
-    elif choice == "0":
+    if not profiles:
+        print("❌ Не найдено ни одного профиля генерации в конфиге.")
+        print("DEBUG: inference.model.generation_profiles =", config_manager.yaml_config.get("inference", {}).get("model", {}).get("generation_profiles"))
+        print("DEBUG: Полный config['inference'] =", config_manager.yaml_config.get("inference"))
         return
 
-    else:
-        print("Неверный выбор")
+    active = config_manager.yaml_config.get("main_settings", {}).get("active_generation_profile") \
+        or config_manager.yaml_config.get("inference", {}).get("active_profile", "creative")
 
-    # Удаляем существующий файл сессии, если были изменены API_ID, API_HASH или PHONE
-    if choice in ["1", "2", "3"]:
-        session_dir = os.path.join(os.path.dirname(__file__), 'src', 'bot', 'session')
-        if os.path.exists(session_dir):
-            for file in os.listdir(session_dir):
-                if file.endswith(".session"):
-                    os.remove(os.path.join(session_dir, file))
-                    print(f"Файл сессии {file} удален для применения новых настроек")
+    print("Доступные профили генерации:")
+    for i, key in enumerate(profiles, 1):
+        current = "✓" if key == active else " "
+        profile = profiles[key]
+        print(f"{i}. [{current}] {key}")
+        print(f"   Длина: {profile.get('max_length', 'Не указано')}, "
+              f"Температура: {profile.get('temperature', 'Не указано')}")
+
+    idx = input("\nВыберите профиль (номер) или 0 для отмены: ")
+
+    if idx.isdigit() and 1 <= int(idx) <= len(profiles):
+        selected = list(profiles.keys())[int(idx)-1]
+        config_manager.update_yaml_setting('inference', 'active_profile', selected)
+        print(f"\n✅ Активный профиль изменен на: {selected}")
+    elif idx == "0":
+        print("Выбор профиля отменен.")
+    else:
+        print("❌ Неверный выбор.")
+
+
+def _handle_default_model_settings(config_manager: ConfigManager):
+    print("\n" + "-"*40)
+    print("     НАСТРОЙКА МОДЕЛИ ПО УМОЛЧАНИЮ")
+    print("-"*40)
+    
+    ml_cfg = config_manager.get_ml_config()
+    current_model = ml_cfg.get("model", "gpt2")
+    
+    print(f"Текущая модель: {current_model}")
+    print("\nПримеры доступных моделей:")
+    print("- gpt2")
+    print("- facebook/opt-125m")
+    print("- EleutherAI/pythia-70m")
+    print("- sberbank-ai/rugpt3small_based_on_gpt2")
+    
+    new_model = input("\nВведите название модели (или Enter для отмены): ").strip()
+    
+    if new_model:
+        config_manager.update_yaml_setting('ml', 'model', new_model)
+        print(f"\n✅ Модель изменена на: {new_model}")
+    else:
+        print("Изменение модели отменено.")
+
+
+def _handle_telegram_mode_settings(config_manager: ConfigManager):
+    print("\n" + "-"*40)
+    print("     НАСТРОЙКА РЕЖИМА TELEGRAM БОТА")
+    print("-"*40)
+    
+    yaml_cfg = config_manager.yaml_config
+    telegram_cfg = yaml_cfg.get("telegram", {})
+    mode_descriptions = telegram_cfg.get("mode_descriptions", {})
+
+    current_mode = yaml_cfg.get("main_settings", {}).get("telegram_mode") \
+        or telegram_cfg.get("mode", "only_private_chats")
+    
+    print(f"Текущий режим: {current_mode}")
+    print("\nДоступные режимы:")
+    
+    modes = list(mode_descriptions.items())
+    for i, (mode, description) in enumerate(modes, 1):
+        current = "✓" if mode == current_mode else " "
+        print(f"{i}. [{current}] {mode}")
+        print(f"   {description}")
+    
+    choice_mode = input("\nВыберите режим (1-{}) или 0 для отмены: ".format(len(modes)))
+    
+    if choice_mode.isdigit() and 1 <= int(choice_mode) <= len(modes):
+        mode_idx = int(choice_mode) - 1
+        new_mode = modes[mode_idx][0]
+
+        config_manager.update_yaml_setting('telegram', 'mode', new_mode)
+        print(f"\n✅ Режим успешно изменен на: {new_mode}")
+    elif choice_mode == "0":
+        print("Изменение режима отменено.")
+    else:
+        print("❌ Неверный выбор.")
+
+
+def _prompt_for_save_if_needed(config_manager: ConfigManager) -> bool:
+    response = input("\nСохранить изменения в файл конфигурации? (д/н): ")
+    return response.lower() in ['д', 'y', 'yes', 'да']
+
+
+def display_menu():
+    print("\n" + "="*40)
+    print("          AI-RESPONDER")
+    print("="*40)
+    print("1. Обучить модель")
+    print("2. Конвертировать JSON в датасет")
+    print("3. Список моделей")
+    print("4. Выбрать модель")
+    print("5. Запустить Telegram-бота")
+    print("6. Настройки")
+    print("7. Выход")
+    print("="*40)
+    return input("Выберите опцию (1-7): ")
 
 async def main():
-    data_processor = DataProcessor()
-    config_data = load_config()
-
-    # Безопасная инициализация ModelTrainer с проверкой поддержки device
+    config_manager = ConfigManager()
+    data_processor = DataProcessor(config_manager)
+    ml_config = config_manager.get_ml_config()
+    model_name = ml_config.get('model', 'gpt2')
     try:
-        model_trainer = ModelTrainer(device=config_data.get("training_device"))
+        model_trainer = ModelTrainer(
+            config_manager,
+            device=config_manager.get_app_config("training_device"),
+            model=model_name
+        )
     except TypeError:
         print("Предупреждение: Ваша версия ModelTrainer не поддерживает выбор устройства. Используется CPU.")
-        model_trainer = ModelTrainer()  # Пробуем без аргумента device
+        model_trainer = ModelTrainer(config_manager, model=model_name)
 
     while True:
         choice = display_menu()
@@ -253,7 +377,7 @@ async def main():
                 print(f"{i}. {dataset['name']} ({dataset['type'].upper()})")
 
             try:
-                file_idx = int(input("\nВ��берите датасет для обучения (номер): ")) - 1
+                file_idx = int(input("\nВыберите датасет для обучения (номер): ")) - 1
                 if 0 <= file_idx < len(datasets):
                     selected_dataset = datasets[file_idx]
 
@@ -269,7 +393,6 @@ async def main():
                         selected_user = participants[user_idx]
                         print(f"\nВыбран пользователь: {selected_user['name']} с ID {selected_user['id']}")
 
-                        # Показываем текущее устройство
                         current_device = model_trainer.get_current_device()
                         available_devices = model_trainer.get_available_devices()
                         print(f"\nТекущее устройство для обучения: {available_devices.get(current_device, current_device)}")
@@ -285,7 +408,7 @@ async def main():
                 print("Пожалуйста, введите число")
 
         elif choice == "2":
-            print("\nВыберите JSON файл для конвертации в дат��сет")
+            print("\nВыберите JSON файл для конвертации в датасет")
 
             json_file_path = select_json_file()
 
@@ -323,7 +446,7 @@ async def main():
                 print(f"   Обучающих пар: {metadata.get('training_pairs_count', 'Неизвестно')}")
                 print(f"   Устройство обучения: {metadata.get('training_device', 'Неизвестно')}")
 
-                if config_data.get("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
+                if config_manager.get_app_config("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
                     print("   ✅ ТЕКУЩАЯ МОДЕЛЬ")
 
         elif choice == "4":
@@ -338,7 +461,7 @@ async def main():
                 metadata = model["metadata"]
                 print(f"{i}. {model['name']} (Пользователь: {metadata.get('target_user', 'Неизвестно')})")
 
-                if config_data.get("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
+                if config_manager.get_app_config("selected_model") == os.path.join(model_trainer.model_dir, model['name']):
                     print("   ✅ ТЕКУЩАЯ МОДЕЛЬ")
 
             try:
@@ -349,8 +472,7 @@ async def main():
 
                     test_generator = ResponseGenerator()
                     if test_generator.load_model(model_path):
-                        config_data["selected_model"] = model_path
-                        save_config(config_data)
+                        config_manager.set_app_config("selected_model", model_path)
                         print(f"\n✅ Модель успешно выбрана: {selected_model['name']}")
                         print(f"   Пользователь: {selected_model['metadata'].get('target_user', 'Неизвестно')}")
                     else:
@@ -363,12 +485,9 @@ async def main():
                 print("Пожалуйста, введите число")
 
         elif choice == "5":
-            change_bot_mode()
-
-        elif choice == "6":
             print("Запуск Telegram клиента...")
 
-            model_path = config_data.get("selected_model")
+            model_path = config_manager.get_app_config("selected_model")
             if not model_path:
                 models = model_trainer.list_trained_models()
                 if models:
@@ -379,22 +498,13 @@ async def main():
                     continue
 
             try:
-                # Проверка минимальной конфигурации перед запуском
-                try:
-                    api_id = config('API_ID')
-                    api_hash = config('API_HASH')
-                    phone = config('PHONE')
-                except UndefinedValueError as e:
-                    print(f"\n❌ Отсутствует обязательный параметр в .env файле: {e}")
-                    print("Используйте пункт 8 для настройки Telegram API.")
-                    continue
-
-                responder = TelegramResponder(model_path)
+                inference_config = config_manager.get_inference_config()
+                responder = TelegramResponder(config_manager, model_path)
                 try:
                     await responder.start()
                 except ValueError as e:
                     print(f"\n❌ Ошибка конфигурации: {e}")
-                    print("Используйте пункт 8 для настройки Telegram API.")
+                    print("Проверьте config.yaml.")
                 except KeyboardInterrupt:
                     print("\n⚠️ Остановка клиента...")
                     await responder.stop()
@@ -407,23 +517,16 @@ async def main():
             except Exception as e:
                 print(f"\n❌ Не удалось запустить Telegram клиент: {e}")
 
+        elif choice == "6":
+            settings_menu(config_manager, model_trainer)
+
         elif choice == "7":
-            # Проверяем поддержку выбора устройства
-            if hasattr(model_trainer, "get_available_devices") and callable(getattr(model_trainer, "get_available_devices")):
-                select_training_device(model_trainer)
-            else:
-                print("\n❌ Ваша версия программы не поддерживает выбор устройства обучения.")
-                print("Пожалуйста, убедитесь, что установлена последняя верс��я.")
-
-        elif choice == "8":
-            configure_telegram_api()
-
-        elif choice == "9":
             print("Выход из программы...")
             break
 
         else:
-            print("Неверный выбор. Пожалуйста, выберите 1-9")
+            print("Неверный выбор. Пожалуйста, выберите 1-7")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

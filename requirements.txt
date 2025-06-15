@@ -10,3 +10,4 @@ bitsandbytes>=0.0.0
 evaluate>=0.0.0
 accelerate>=0.20.0
 pyyaml
+python-dotenv

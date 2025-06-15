@@ -25,6 +25,7 @@ import logging
 import asyncio
 import yaml
 from pathlib import Path
+from dotenv import load_dotenv
 from pyrogram import Client
 from pyrogram.handlers import MessageHandler
 from pyrogram.enums import ChatAction, ChatType
@@ -37,7 +38,19 @@ from pyrogram.errors import (
 from src.utils.inference import ResponseGenerator
 
 class TelegramResponder:
-    def __init__(self, config_manager=None, model_path=None):
+    def __init__(
+        self,
+        config_manager=None,
+        model_path=None,
+        api_id=None,
+        api_hash=None,
+        phone=None,
+        login=None,
+        target_user_ids=None,
+        target_channel_ids=None
+    ):
+
+        load_dotenv()
         try:
             if config_manager:
                 telegram_config = config_manager.get_telegram_config()
@@ -46,7 +59,6 @@ class TelegramResponder:
                 logging.basicConfig(level=getattr(logging, logging_config.get('level', 'INFO')),
                                   format=logging_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
             else:
-                # Backward compatibility
                 config_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / 'config' / 'config.yaml'
                 with open(config_path, 'r') as f:
                     config = yaml.safe_load(f)
@@ -56,27 +68,25 @@ class TelegramResponder:
                 logging.basicConfig(level=getattr(logging, logging_config['level']), format=logging_config['format'])
                 
             self.logger = logging.getLogger(__name__)
-            
-            self.api_id = telegram_config['api_id']
-            self.api_hash = telegram_config['api_hash']
-            self.phone = telegram_config['phone']
-            self.login = telegram_config['login']
 
-            if not self.api_id or not self.api_hash:
-                self.logger.error("API_ID или API_HASH отсутствуют в конфигурации")
-                raise ValueError("API_ID и API_HASH должны быть указаны в config.yaml")
-                
-            if not self.phone or len(self.phone) < 5:
-                self.logger.error(f"Неверный номер телефона в конфигурации: {self.phone}")
-                raise ValueError("Номер телефона должен быть указан в config.yaml")
-                
-            if not self.login:
-                self.logger.warning("LOGIN не указан, будет использовано значение 'user'")
-                self.login = 'user'
-                
-            self.target_user_ids = telegram_config.get('target_user_ids', [-1])
-            self.target_channel_ids = telegram_config.get('target_channel_ids', [-1])
-            
+            self.api_id = api_id or os.getenv("API_ID") or telegram_config.get('api_id')
+            self.api_hash = api_hash or os.getenv("API_HASH") or telegram_config.get('api_hash')
+            self.phone = phone or os.getenv("PHONE") or telegram_config.get('phone')
+            self.login = login or os.getenv("LOGIN") or telegram_config.get('login')
+
+            env_user_ids = os.getenv("TARGET_USER_IDS")
+            env_channel_ids = os.getenv("TARGET_CHANNEL_IDS")
+            self.target_user_ids = (
+                target_user_ids if target_user_ids is not None else
+                [int(x.strip()) for x in env_user_ids.split(",") if x.strip()] if env_user_ids else
+                telegram_config.get('target_user_ids', [-1])
+            )
+            self.target_channel_ids = (
+                target_channel_ids if target_channel_ids is not None else
+                [int(x.strip()) for x in env_channel_ids.split(",") if x.strip()] if env_channel_ids else
+                telegram_config.get('target_channel_ids', [-1])
+            )
+
             self.mode = telegram_config.get('mode', 'only_private_chats')
             
             self.session_path = os.path.join(os.path.dirname(__file__), 'session', self.login)
@@ -143,7 +153,7 @@ class TelegramResponder:
 
         if not message.text:
             return
-        print(message.chat.type, message.chat.id, message.from_user.id, message.text)
+
         try:
             if self.mode == "only_private_chats":
                 if message.chat.type == ChatType.PRIVATE:
@@ -175,8 +185,7 @@ class TelegramResponder:
         print(f"Активная модель: {self.model_info}")
         print(f"Режим: {self.mode}")
         print("Запуск клиента...")
-        
-        # Добавляем тайм-аут и обработку ошибок подключения
+
         try:
             self.logger.info("Подключение к Telegram API...")
             await asyncio.wait_for(self.client.start(), timeout=60.0)

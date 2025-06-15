@@ -20,15 +20,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import os
-import json
-import re
-import csv
-from typing import List, Dict, Tuple
 import logging
-from collections import Counter
+import json
 import yaml
+import csv
+import re
+import os
+
+from typing import List, Dict, Tuple
+from collections import Counter
 from pathlib import Path
+
 
 class DataProcessor:
     def __init__(self, config_manager=None):
@@ -38,7 +40,6 @@ class DataProcessor:
             logging.basicConfig(level=getattr(logging, logging_config.get('level', 'INFO')), 
                              format=logging_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         else:
-            # Backward compatibility - load config directly if no config_manager provided
             config_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / 'config' / 'config.yaml'
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)
@@ -49,7 +50,6 @@ class DataProcessor:
         self.logger = logging.getLogger(__name__)
         base_dir = os.path.dirname(__file__)
 
-        # Use get() with defaults for safer configuration access
         directories_config = self.config.get('directories', {})
         self.base_model_dir = os.path.join(base_dir, directories_config.get('base_model_dir', 'model'))
         self.jsonl_dir = os.path.join(self.base_model_dir, directories_config.get('jsonl_dir', 'json'))
@@ -57,8 +57,7 @@ class DataProcessor:
         
         os.makedirs(self.jsonl_dir, exist_ok=True)
         os.makedirs(self.csv_dir, exist_ok=True)
-        
-        # Get regex patterns with defaults
+
         regex_patterns = self.config.get('regex', {})
         emoji_pattern = regex_patterns.get('emoji_pattern', "[\U0001F600-\U0001F64F]")
         self.EMOJI_PATTERN = re.compile(emoji_pattern, flags=re.UNICODE)

@@ -2,7 +2,6 @@ app:
   name: "AI-Responder"
   version: "1.0.0"
 
-# === ВАЖНЫЕ НАСТРОЙКИ ДЛЯ БЫСТРОГО ДОСТУПА ===
 main_settings:
   active_generation_profile: "creative"
   model: "sberbank-ai/rugpt3small_based_on_gpt2"
@@ -14,12 +13,6 @@ logging:
   format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
 telegram:
-  api_id:
-  api_hash: ""
-  phone: ""
-  login: ""
-  target_user_ids: []
-  target_channel_ids: []
   mode: "only_private_chats"
   mode_descriptions:
     only_channel_messages: "отвечает на все сообщения в беседах (если target_channel_ids=[-1], только в указанных беседах)"

@@ -21,12 +21,11 @@
 # SOFTWARE.
 
 import os
-import json
 import yaml
 import asyncio
 import tkinter as tk
 from tkinter import filedialog
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from src.utils.data_processor import DataProcessor
 from src.ml.model_trainer import ModelTrainer
@@ -34,7 +33,6 @@ from src.utils.inference import ResponseGenerator
 from src.bot.telegram_client import TelegramResponder
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, 'config', 'config.json')
 YAML_CONFIG_FILE = os.path.join(BASE_DIR, 'config', 'config.yaml')
 
 class ConfigManager:
@@ -42,7 +40,6 @@ class ConfigManager:
     def __init__(self):
         self.config = {}
         self.yaml_config = self._load_yaml_config()
-        self.app_config = self._load_app_config()
 
     def _load_yaml_config(self) -> Dict[str, Any]:
         if os.path.exists(YAML_CONFIG_FILE):
@@ -53,27 +50,7 @@ class ConfigManager:
                 print(f"Ошибка загрузки YAML конфигурации: {e}")
         return {}
 
-    def _load_app_config(self) -> Dict[str, Any]:
-        if os.path.exists(CONFIG_FILE):
-            try:
-                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-            except json.JSONDecodeError as e:
-                print(f"Ошибка в формате JSON файла конфигурации: {e}")
-            except Exception as e:
-                print(f"Не удалось загрузить конфигурацию: {e}")
-        return {"selected_model": None, "training_device": None}
-
-    def save_app_config(self):
-        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-        try:
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(self.app_config, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"Не удалось сохранить конфигурацию: {e}")
-
     def save_yaml_config(self):
-        """Сохраняет YAML конфигурацию в файл."""
         os.makedirs(os.path.dirname(YAML_CONFIG_FILE), exist_ok=True)
         try:
             with open(YAML_CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -93,15 +70,16 @@ class ConfigManager:
             return default
 
     def get_section(self, section: str, default: Any = None) -> Any:
-        """Get an entire configuration section."""
         return self.yaml_config.get(section, default)
 
     def get_app_config(self, key: str, default: Any = None) -> Any:
-        return self.app_config.get(key, default)
+        return self.yaml_config.get('main_settings', {}).get(key, default)
 
     def set_app_config(self, key: str, value: Any):
-        self.app_config[key] = value
-        self.save_app_config()
+        if 'main_settings' not in self.yaml_config:
+            self.yaml_config['main_settings'] = {}
+        self.yaml_config['main_settings'][key] = value
+        self.save_yaml_config()
 
     def get_ml_config(self) -> Dict[str, Any]:
         return self.yaml_config.get('ml', {})
@@ -130,7 +108,8 @@ class ConfigManager:
             mapping = {
                 'ml': {'model': 'model'},
                 'telegram': {'mode': 'telegram_mode'},
-                'inference': {'active_profile': 'active_generation_profile'}
+                'inference': {'active_profile': 'active_generation_profile'},
+                'main_settings': {}
             }
             
             if section in mapping and key in mapping[section]:

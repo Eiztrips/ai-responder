@@ -47,7 +47,6 @@ class ModelTrainer:
             logging.basicConfig(level=getattr(logging, logging_config.get('level', 'INFO')),
                           format=logging_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         else:
-            # Backward compatibility
             config_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / 'config' / 'config.yaml'
             with open(config_path, 'r') as f:
                 self.config = yaml.safe_load(f)
@@ -66,8 +65,7 @@ class ModelTrainer:
         self.model_name = model or ml_config.get('model') or self.config.get('default_model')
         self.available_devices = self._get_available_devices()
         self.device = device if device and device in self.available_devices else self._get_default_device()
-        
-        # Set environment variables from config
+
         if 'device' in self.config.get('inference', {}) and 'cuda_env_vars' in self.config['inference']['device']:
             for key, value in self.config['inference']['device']['cuda_env_vars'].items():
                 os.environ[key] = value

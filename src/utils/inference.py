@@ -36,18 +36,15 @@ class ResponseGenerator:
         if config_manager:
             self.config = config_manager.get_inference_config()
             logging_config = config_manager.get_section('logging', {})
-            # Set environment variables from config
             if 'device' in self.config and 'cuda_env_vars' in self.config['device']:
                 for key, value in self.config['device']['cuda_env_vars'].items():
                     os.environ[key] = value
         else:
-            # Backward compatibility
             config_path = Path(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) / 'config' / 'config.yaml'
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)
             self.config = config['inference']
             logging_config = config['logging']
-            # Set environment variable from config
             os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = self.config['device']['cuda_env_vars']['PYTORCH_MPS_HIGH_WATERMARK_RATIO']
 
         logging.basicConfig(level=getattr(logging, logging_config.get('level', 'INFO')), 

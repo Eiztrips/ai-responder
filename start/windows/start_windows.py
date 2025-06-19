@@ -28,7 +28,7 @@ import asyncio
 import gc
 import torch
 
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 os.environ["OMP_NUM_THREADS"] = "4"
 

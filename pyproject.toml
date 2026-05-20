@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-responder"
+version = "3.0.0"
+description = "Telegram-бот, имитирующий стиль общения пользователя на основе истории переписки, с RAG и LoRA-обучением."
+readme = "README.MD"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Eiztrips" }]
+keywords = ["telegram", "llm", "rag", "lora", "transformers", "pytorch"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pyrogram>=2.0.106",
+    "tgcrypto>=1.2.5",
+    "torch>=2.2",
+    "transformers>=4.41",
+    "datasets>=2.19",
+    "accelerate>=0.30",
+    "peft>=0.11",
+    "sentence-transformers>=3.0",
+    "faiss-cpu>=1.8",
+    "numpy>=1.26",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
+    "loguru>=0.7",
+    "rapidfuzz>=3.9",
+    "cachetools>=5.3",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6", "mypy>=1.10"]
+cuda = ["bitsandbytes>=0.43"]
+
+[project.scripts]
+ai-responder = "aiResponder.cli:run"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PL"]
+ignore = ["E501", "PLR0913", "PLR2004"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+ignore_missing_imports = true

@@ -1,0 +1,69 @@
+# Профили:
+#   docker compose --profile cpu  run --rm app   — общий профиль для x86_64/ARM64 без NVIDIA
+#   docker compose --profile cuda run --rm app   — для NVIDIA GPU (нужен nvidia-container-toolkit)
+#
+# Для Apple Silicon (M1/M2/M3) с MPS используйте `make run-mac` — Docker не пробрасывает
+# Metal внутрь контейнера, и обучение/инференс пойдут только на CPU/ARM64.
+
+services:
+  app:
+    profiles: ["cpu"]
+    image: ai-responder:cpu
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cpu
+    container_name: ai-responder-cpu
+    stdin_open: true
+    tty: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AI_RESPONDER_DEVICE: ${AI_RESPONDER_DEVICE:-cpu}
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
+      HF_HOME: /app/.hf-cache
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./rag_index:/app/rag_index
+      - ./logs:/app/logs
+      - ./sessions:/app/sessions
+      - hf_cache:/app/.hf-cache
+
+  app-cuda:
+    profiles: ["cuda"]
+    image: ai-responder:cuda
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cuda
+    container_name: ai-responder-cuda
+    stdin_open: true
+    tty: true
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AI_RESPONDER_DEVICE: ${AI_RESPONDER_DEVICE:-cuda}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-8}
+      HF_HOME: /app/.hf-cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./rag_index:/app/rag_index
+      - ./logs:/app/logs
+      - ./sessions:/app/sessions
+      - hf_cache:/app/.hf-cache
+
+volumes:
+  hf_cache: {}

@@ -1,5 +1,7 @@
+.venv/
 venv/
 env/
+.env
 config/.env
 
 __pycache__/
@@ -7,27 +9,27 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.mypy_cache/
+.ruff_cache/
 
 *.egg
 *.egg-info/
 dist/
 build/
-eggs/
-parts/
-sdist/
-develop-eggs/
-.installed.cfg
 
 *.log
-training_log.txt
 logs/
+training_log.txt
 
-**/session/
+sessions/
+*.session
+*.session-journal
 
-**/trained_models/
-
-**/model/json/
-**/model/csv/
+models/
+data/raw/
+data/datasets/
+rag_index/
+.hf-cache/
 
 .idea/
 .vscode/
@@ -39,4 +41,4 @@ logs/
 .AppleDouble
 .LSOverride
 
-*config.json
+config/config.json

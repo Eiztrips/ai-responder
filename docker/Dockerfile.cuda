@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1.7
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04 AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    AI_RESPONDER_HOME=/app \
+    PYTHONPATH=/app/src \
+    HF_HOME=/app/.hf-cache
+
+WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        python3.11 python3.11-venv python3-pip python3.11-dev \
+        git build-essential ca-certificates curl \
+ && ln -sf /usr/bin/python3.11 /usr/local/bin/python \
+ && ln -sf /usr/bin/python3.11 /usr/local/bin/python3 \
+ && rm -rf /var/lib/apt/lists/*
+
+FROM base AS deps
+COPY requirements.txt pyproject.toml /app/
+RUN python -m pip install --upgrade pip wheel \
+ && pip install --index-url https://download.pytorch.org/whl/cu124 "torch>=2.2" \
+ && pip install -r requirements.txt \
+ && pip install "bitsandbytes>=0.43" || true
+
+FROM deps AS runtime
+COPY . /app
+RUN chmod +x /app/docker/entrypoint.sh
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
+CMD ["python", "-m", "aiResponder"]

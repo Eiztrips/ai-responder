@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1.7
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    AI_RESPONDER_HOME=/app \
+    PYTHONPATH=/app/src \
+    HF_HOME=/app/.hf-cache
+
+WORKDIR /app
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git build-essential ca-certificates curl \
+ && rm -rf /var/lib/apt/lists/*
+
+FROM base AS deps
+COPY requirements.txt pyproject.toml /app/
+RUN pip install --upgrade pip wheel \
+ && pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2" \
+ && pip install -r requirements.txt
+
+FROM deps AS runtime
+COPY . /app
+RUN chmod +x /app/docker/entrypoint.sh
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
+CMD ["python", "-m", "aiResponder"]

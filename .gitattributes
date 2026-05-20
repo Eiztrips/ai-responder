@@ -1,0 +1,7 @@
+# Shell scripts must use LF — CRLF breaks Linux shebang (bash\r).
+*.sh text eol=lf
+docker/entrypoint.sh text eol=lf
+
+# Docker / compose
+Dockerfile* text eol=lf
+docker-compose.yml text eol=lf

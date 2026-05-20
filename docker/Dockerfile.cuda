@@ -29,7 +29,10 @@ RUN python -m pip install --upgrade pip wheel \
 
 FROM deps AS runtime
 COPY . /app
-RUN sed -i 's/\r$//' /app/docker/entrypoint.sh \
+# Strip Windows CRLF (fixes: /usr/bin/env: 'bash\r': No such file or directory)
+RUN tr -d '\r' < /app/docker/entrypoint.sh > /tmp/entrypoint.sh \
+ && mv /tmp/entrypoint.sh /app/docker/entrypoint.sh \
  && chmod +x /app/docker/entrypoint.sh
-ENTRYPOINT ["/app/docker/entrypoint.sh"]
+# Invoke bash explicitly — kernel must not parse a CRLF shebang (#!/usr/bin/env bash\r)
+ENTRYPOINT ["/bin/bash", "/app/docker/entrypoint.sh"]
 CMD ["python", "-m", "aiResponder"]

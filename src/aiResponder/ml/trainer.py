@@ -16,7 +16,6 @@ import inspect
 import json
 import os
 import random
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -147,36 +146,11 @@ class ModelTrainer:
 
         # Защищаемся от drift'а API transformers: в 4.46+ удалены некоторые
         # «исторические» kwargs (например `overwrite_output_dir`). Фильтруем
-        # `params` по реальной сигнатуре `TrainingArguments.__init__` и
-        # логируем то, что пришлось выбросить — чтобы это сразу было видно
-        # в diagnostics, а не падало в TypeError.
+        # `params` по реальной сигнатуре `TrainingArguments.__init__`.
         supported = set(inspect.signature(TrainingArguments.__init__).parameters)
         dropped = [k for k in list(params) if k not in supported]
         for k in dropped:
             params.pop(k, None)
-
-        # #region agent log
-        try:
-            _payload = {
-                "sessionId": "9da7f4",
-                "runId": "training-args",
-                "hypothesisId": "A+B+C",
-                "location": "src/aiResponder/ml/trainer.py:_resolve_args",
-                "message": "TrainingArguments resolved",
-                "data": {
-                    "transformers_version": transformers.__version__,
-                    "device": self.profile.device,
-                    "params_keys": sorted(params.keys()),
-                    "dropped_unsupported": sorted(dropped),
-                },
-                "timestamp": int(time.time() * 1000),
-            }
-            with open("/app/logs/debug-9da7f4.log", "a", encoding="utf-8") as _fh:
-                _fh.write(json.dumps(_payload) + "\n")
-        except Exception:
-            pass
-        # #endregion
-
         if dropped:
             logger.warning(
                 "TrainingArguments: отброшены неподдерживаемые ключи {} (transformers={})",

@@ -1,13 +1,13 @@
-"""Типизированные настройки приложения на pydantic-settings.
+﻿"""РўРёРїРёР·РёСЂРѕРІР°РЅРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё РїСЂРёР»РѕР¶РµРЅРёСЏ РЅР° pydantic-settings.
 
-Источник данных:
-    1. ``config/config.yaml`` — все основные параметры.
-    2. ``.env`` / переменные окружения — чувствительные значения
-       (``API_ID``, ``API_HASH``, ``PHONE``, ``LOGIN``, и т.д.).
+РСЃС‚РѕС‡РЅРёРє РґР°РЅРЅС‹С…:
+    1. ``config/config.yaml`` вЂ” РІСЃРµ РѕСЃРЅРѕРІРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹.
+    2. ``.env`` / РїРµСЂРµРјРµРЅРЅС‹Рµ РѕРєСЂСѓР¶РµРЅРёСЏ вЂ” С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ
+       (``API_ID``, ``API_HASH``, ``PHONE``, ``LOGIN``, Рё С‚.Рґ.).
 
-YAML является основой, переменные окружения переопределяют только секцию
-``telegram`` (api_id/api_hash/phone/login и списки целей). Так уходит весь
-``yaml.safe_load`` и хрупкие ``eval()`` из старого кода.
+YAML СЏРІР»СЏРµС‚СЃСЏ РѕСЃРЅРѕРІРѕР№, РїРµСЂРµРјРµРЅРЅС‹Рµ РѕРєСЂСѓР¶РµРЅРёСЏ РїРµСЂРµРѕРїСЂРµРґРµР»СЏСЋС‚ С‚РѕР»СЊРєРѕ СЃРµРєС†РёСЋ
+``telegram`` (api_id/api_hash/phone/login Рё СЃРїРёСЃРєРё С†РµР»РµР№). РўР°Рє СѓС…РѕРґРёС‚ РІРµСЃСЊ
+``yaml.safe_load`` Рё С…СЂСѓРїРєРёРµ ``eval()`` РёР· СЃС‚Р°СЂРѕРіРѕ РєРѕРґР°.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from aiResponder.utils.paths import (
 
 
 class AppConfig(BaseModel):
-    """Метаданные приложения."""
+    """РњРµС‚Р°РґР°РЅРЅС‹Рµ РїСЂРёР»РѕР¶РµРЅРёСЏ."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -39,7 +39,7 @@ class AppConfig(BaseModel):
 
 
 class LoggingConfig(BaseModel):
-    """Параметры логирования."""
+    """РџР°СЂР°РјРµС‚СЂС‹ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -48,7 +48,7 @@ class LoggingConfig(BaseModel):
 
 
 class TelegramConfig(BaseModel):
-    """Параметры Telegram-клиента (Pyrogram)."""
+    """РџР°СЂР°РјРµС‚СЂС‹ Telegram-РєР»РёРµРЅС‚Р° (Pyrogram)."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -63,7 +63,7 @@ class TelegramConfig(BaseModel):
 
 
 class GenerationProfile(BaseModel):
-    """Профиль семплинга для ``model.generate``."""
+    """РџСЂРѕС„РёР»СЊ СЃРµРјРїР»РёРЅРіР° РґР»СЏ ``model.generate``."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -85,7 +85,7 @@ class InferenceCacheConfig(BaseModel):
 
 
 class InferenceModelConfig(BaseModel):
-    """Где искать обученные модели и какие профили генерации доступны."""
+    """Р“РґРµ РёСЃРєР°С‚СЊ РѕР±СѓС‡РµРЅРЅС‹Рµ РјРѕРґРµР»Рё Рё РєР°РєРёРµ РїСЂРѕС„РёР»Рё РіРµРЅРµСЂР°С†РёРё РґРѕСЃС‚СѓРїРЅС‹."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -95,7 +95,7 @@ class InferenceModelConfig(BaseModel):
 
 
 class InferenceConfig(BaseModel):
-    """Настройки инференса."""
+    """РќР°СЃС‚СЂРѕР№РєРё РёРЅС„РµСЂРµРЅСЃР°."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -105,10 +105,10 @@ class InferenceConfig(BaseModel):
 
 
 class FiltersConfig(BaseModel):
-    """Эвристики фильтрации мусора в исходной переписке.
+    """Р­РІСЂРёСЃС‚РёРєРё С„РёР»СЊС‚СЂР°С†РёРё РјСѓСЃРѕСЂР° РІ РёСЃС…РѕРґРЅРѕР№ РїРµСЂРµРїРёСЃРєРµ.
 
-    Дефолты подобраны мягко: короткие человеческие реплики («ок», «+», «да»)
-    сохраняются, а удаляется только очевидный шум.
+    Р”РµС„РѕР»С‚С‹ РїРѕРґРѕР±СЂР°РЅС‹ РјСЏРіРєРѕ: РєРѕСЂРѕС‚РєРёРµ С‡РµР»РѕРІРµС‡РµСЃРєРёРµ СЂРµРїР»РёРєРё (В«РѕРєВ», В«+В», В«РґР°В»)
+    СЃРѕС…СЂР°РЅСЏСЋС‚СЃСЏ, Р° СѓРґР°Р»СЏРµС‚СЃСЏ С‚РѕР»СЊРєРѕ РѕС‡РµРІРёРґРЅС‹Р№ С€СѓРј.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -126,26 +126,26 @@ class FiltersConfig(BaseModel):
     allow_short_replies: bool = True
     short_reply_whitelist: list[str] = Field(
         default_factory=lambda: [
-            "ок",
+            "РѕРє",
             "+",
             "+1",
-            "да",
-            "нет",
-            "ну",
-            "хм",
-            "согл",
-            "ага",
-            "ок.",
+            "РґР°",
+            "РЅРµС‚",
+            "РЅСѓ",
+            "С…Рј",
+            "СЃРѕРіР»",
+            "Р°РіР°",
+            "РѕРє.",
             "spas",
-            "спс",
-            "лол",
-            "ок!",
+            "СЃРїСЃ",
+            "Р»РѕР»",
+            "РѕРє!",
         ]
     )
 
 
 class NicknameConfig(BaseModel):
-    """Нормализация и склейка алиасов."""
+    """РќРѕСЂРјР°Р»РёР·Р°С†РёСЏ Рё СЃРєР»РµР№РєР° Р°Р»РёР°СЃРѕРІ."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -155,7 +155,7 @@ class NicknameConfig(BaseModel):
 
 
 class DataProcessorConfig(BaseModel):
-    """Параметры конвертации/чистки данных."""
+    """РџР°СЂР°РјРµС‚СЂС‹ РєРѕРЅРІРµСЂС‚Р°С†РёРё/С‡РёСЃС‚РєРё РґР°РЅРЅС‹С…."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -185,7 +185,7 @@ class DataProcessorConfig(BaseModel):
 
 
 class LoraConfig(BaseModel):
-    """LoRA-параметры для PEFT."""
+    """LoRA-РїР°СЂР°РјРµС‚СЂС‹ РґР»СЏ PEFT."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -198,10 +198,10 @@ class LoraConfig(BaseModel):
 
 
 class TrainingDeviceArgs(BaseModel):
-    """``TrainingArguments`` для конкретного устройства.
+    """``TrainingArguments`` РґР»СЏ РєРѕРЅРєСЂРµС‚РЅРѕРіРѕ СѓСЃС‚СЂРѕР№СЃС‚РІР°.
 
-    Поля совпадают с ключами ``transformers.TrainingArguments``. Значения хранятся
-    как обычные питоновые типы — без ``eval``-строк, как было в legacy-конфиге.
+    РџРѕР»СЏ СЃРѕРІРїР°РґР°СЋС‚ СЃ РєР»СЋС‡Р°РјРё ``transformers.TrainingArguments``. Р—РЅР°С‡РµРЅРёСЏ С…СЂР°РЅСЏС‚СЃСЏ
+    РєР°Рє РѕР±С‹С‡РЅС‹Рµ РїРёС‚РѕРЅРѕРІС‹Рµ С‚РёРїС‹ вЂ” Р±РµР· ``eval``-СЃС‚СЂРѕРє, РєР°Рє Р±С‹Р»Рѕ РІ legacy-РєРѕРЅС„РёРіРµ.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -221,17 +221,17 @@ class TrainingDeviceArgs(BaseModel):
     weight_decay: float = 0.01
     lr_scheduler_type: str = "cosine"
     report_to: str = "none"
-    dataloader_num_workers: int | str = 0  # допускается "auto"
+    dataloader_num_workers: int | str = 0  # РґРѕРїСѓСЃРєР°РµС‚СЃСЏ "auto"
     gradient_checkpointing: bool = True
     torch_compile: bool = False
 
 
 class TrainingConfig(BaseModel):
-    """Корневая секция обучения."""
+    """РљРѕСЂРЅРµРІР°СЏ СЃРµРєС†РёСЏ РѕР±СѓС‡РµРЅРёСЏ."""
 
     model_config = ConfigDict(extra="allow")
 
-    model: str = "sberbank-ai/rugpt3small_based_on_gpt2"
+    model: str = "ai-forever/rugpt3medium_based_on_gpt2"
     min_training_pairs: int = 5
     model_name_format: str = "{user}_{model}"
     dataset_max_length: int = 512
@@ -242,7 +242,7 @@ class TrainingConfig(BaseModel):
     device_priority: list[str] = Field(default_factory=lambda: ["cuda", "mps", "cpu"])
     device_names: dict[str, str] = Field(
         default_factory=lambda: {
-            "cpu": "Процессор (CPU)",
+            "cpu": "РџСЂРѕС†РµСЃСЃРѕСЂ (CPU)",
             "cuda": "NVIDIA GPU (CUDA)",
             "mps": "Apple Silicon GPU (MPS)",
         }
@@ -252,7 +252,7 @@ class TrainingConfig(BaseModel):
 
 
 class RagConfig(BaseModel):
-    """Параметры RAG."""
+    """РџР°СЂР°РјРµС‚СЂС‹ RAG."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -266,22 +266,22 @@ class RagConfig(BaseModel):
 
 
 class MainSettings(BaseModel):
-    """Runtime-настройки, обычно меняемые через меню."""
+    """Runtime-РЅР°СЃС‚СЂРѕР№РєРё, РѕР±С‹С‡РЅРѕ РјРµРЅСЏРµРјС‹Рµ С‡РµСЂРµР· РјРµРЅСЋ."""
 
     model_config = ConfigDict(extra="allow")
 
     active_generation_profile: str = "balanced"
-    model: str = "sberbank-ai/rugpt3small_based_on_gpt2"
+    model: str = "ai-forever/rugpt3medium_based_on_gpt2"
     telegram_mode: str = "only_private_chats"
     training_device: str = "auto"
     selected_model: str | None = None
 
 
 class Settings(BaseSettings):
-    """Полная конфигурация приложения.
+    """РџРѕР»РЅР°СЏ РєРѕРЅС„РёРіСѓСЂР°С†РёСЏ РїСЂРёР»РѕР¶РµРЅРёСЏ.
 
-    Создаётся через :func:`load_settings`, который объединяет данные из
-    ``config/config.yaml`` и переменных окружения.
+    РЎРѕР·РґР°С‘С‚СЃСЏ С‡РµСЂРµР· :func:`load_settings`, РєРѕС‚РѕСЂС‹Р№ РѕР±СЉРµРґРёРЅСЏРµС‚ РґР°РЅРЅС‹Рµ РёР·
+    ``config/config.yaml`` Рё РїРµСЂРµРјРµРЅРЅС‹С… РѕРєСЂСѓР¶РµРЅРёСЏ.
     """
 
     model_config = SettingsConfigDict(
@@ -305,15 +305,15 @@ class Settings(BaseSettings):
     @field_validator("training", mode="before")
     @classmethod
     def _ensure_training_args(cls, value: Any) -> Any:  # noqa: D401
-        """Принять ``args`` как dict устройство→dict, без eval-строк."""
+        """РџСЂРёРЅСЏС‚СЊ ``args`` РєР°Рє dict СѓСЃС‚СЂРѕР№СЃС‚РІРѕв†’dict, Р±РµР· eval-СЃС‚СЂРѕРє."""
         if isinstance(value, dict) and "args" not in value:
             value["args"] = {}
         return value
 
     def write_yaml(self, path: Path | None = None) -> Path:
-        """Сериализовать настройки в YAML.
+        """РЎРµСЂРёР°Р»РёР·РѕРІР°С‚СЊ РЅР°СЃС‚СЂРѕР№РєРё РІ YAML.
 
-        Запись идёт в указанный путь либо в :func:`config_path`. Возвращает путь.
+        Р—Р°РїРёСЃСЊ РёРґС‘С‚ РІ СѓРєР°Р·Р°РЅРЅС‹Р№ РїСѓС‚СЊ Р»РёР±Рѕ РІ :func:`config_path`. Р’РѕР·РІСЂР°С‰Р°РµС‚ РїСѓС‚СЊ.
         """
         target = path or config_path()
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -328,26 +328,26 @@ class Settings(BaseSettings):
         return target
 
     def datasets_path(self) -> Path:
-        """Каталог датасетов (учитывая возможный override в YAML)."""
+        """РљР°С‚Р°Р»РѕРі РґР°С‚Р°СЃРµС‚РѕРІ (СѓС‡РёС‚С‹РІР°СЏ РІРѕР·РјРѕР¶РЅС‹Р№ override РІ YAML)."""
         configured = self.data_processor.datasets_dir
         path = Path(configured)
         return path if path.is_absolute() else datasets_dir().parent / Path(configured).name
 
     def models_path(self) -> Path:
-        """Каталог обученных моделей."""
+        """РљР°С‚Р°Р»РѕРі РѕР±СѓС‡РµРЅРЅС‹С… РјРѕРґРµР»РµР№."""
         configured = self.inference.model.models_dir
         path = Path(configured)
         return path if path.is_absolute() else models_dir()
 
     def rag_index_path(self) -> Path:
-        """Каталог RAG-индексов."""
+        """РљР°С‚Р°Р»РѕРі RAG-РёРЅРґРµРєСЃРѕРІ."""
         configured = self.rag.index_dir
         path = Path(configured)
         return path if path.is_absolute() else rag_index_dir()
 
 
 def _apply_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
-    """Накатить чувствительные env-переменные поверх YAML."""
+    """РќР°РєР°С‚РёС‚СЊ С‡СѓРІСЃС‚РІРёС‚РµР»СЊРЅС‹Рµ env-РїРµСЂРµРјРµРЅРЅС‹Рµ РїРѕРІРµСЂС… YAML."""
     telegram = data.setdefault("telegram", {})
     env_api_id = os.getenv("API_ID")
     env_api_hash = os.getenv("API_HASH")
@@ -379,10 +379,10 @@ def _apply_env_overrides(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def load_settings(path: Path | None = None) -> Settings:
-    """Прочитать настройки из YAML + .env и вернуть :class:`Settings`.
+    """РџСЂРѕС‡РёС‚Р°С‚СЊ РЅР°СЃС‚СЂРѕР№РєРё РёР· YAML + .env Рё РІРµСЂРЅСѓС‚СЊ :class:`Settings`.
 
     Args:
-        path: Альтернативный путь к YAML-файлу. По умолчанию — ``config/config.yaml``.
+        path: РђР»СЊС‚РµСЂРЅР°С‚РёРІРЅС‹Р№ РїСѓС‚СЊ Рє YAML-С„Р°Р№Р»Сѓ. РџРѕ СѓРјРѕР»С‡Р°РЅРёСЋ вЂ” ``config/config.yaml``.
     """
     yaml_path = path or config_path()
     raw: dict[str, Any] = {}

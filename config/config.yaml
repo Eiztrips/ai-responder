@@ -8,7 +8,7 @@ logging:
 
 main_settings:
   active_generation_profile: balanced
-  model: sberbank-ai/rugpt3small_based_on_gpt2
+  model: ai-forever/rugpt3medium_based_on_gpt2
   telegram_mode: only_private_chats
   training_device: auto
   selected_model: null
@@ -134,7 +134,7 @@ rag:
   max_pairs_in_prompt: 4
 
 training:
-  model: sberbank-ai/rugpt3small_based_on_gpt2
+  model: ai-forever/rugpt3medium_based_on_gpt2
   min_training_pairs: 5
   model_name_format: "{user}_{model}"
   dataset_max_length: 512
